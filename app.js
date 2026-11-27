@@ -41,6 +41,9 @@
   var STATUS_LABEL = { online: '온라인', working: '작업중', away: '대기' };
   var STATUS_ORDER = ['online', 'working', 'away'];
 
+  // 처음 배치할 때 구역을 골고루 나눠 앉힌다.
+  var PREF_ZONES = ['회의실', '회의실', '작업실', '작업실', '라운지', '회의실', '작업실', '라운지'];
+
   var LINES = {
     주봇: ['회의 시작할까요?', '안건 순서대로 볼게요', '모두 모였네요!', '오늘도 화이팅이에요', '기록은 민트가 맡아요'],
     general: [
@@ -250,7 +253,8 @@
         node.dataset.id = p.id;
         officeChars.appendChild(node);
         charEls.set(p.id, node);
-        var seat = pickSeat(i < 6 ? '회의실' : (i < 9 ? '작업실' : '라운지'), p.id);
+        var prefZone = PREF_ZONES[i] || ['회의실', '작업실', '라운지'][i % 3];
+        var seat = pickSeat(prefZone, p.id);
         if (seat < 0) seat = i % SEATS.length;
         charSeats.set(p.id, seat);
         node.style.transition = 'none';
@@ -757,6 +761,8 @@
         var data = await r.json();
         if (data) { applyRemote(data, true); }
         else { push(true); }
+        var d = $('#dlgSync');
+        if (d && d.open) d.close();
         return true;
       } catch (e) {
         chip('error', '연결 실패');
@@ -809,7 +815,6 @@
         var msg = 'HTTP ' + res.status;
         chip('error', '연결 실패 (' + res.status + ')');
         setSyncStatus('연결 실패: ' + msg + ' — 데이터베이스 규칙에서 읽기/쓰기를 허용했는지 확인해 주세요.', 'error');
-        startPolling(true);
         return;
       }
       if (!res.body) { startPolling(false); return; }
@@ -932,11 +937,10 @@
 
   $('#formSync').addEventListener('submit', function (e) {
     e.preventDefault();
-    Sync.apply($('#syncUrl').value, $('#syncRoom').value);
-    if (!$('#syncUrl').value.trim()) return;
-    setTimeout(function () {
-      if ($('#syncStatus').dataset.kind !== 'error') dlg.close();
-    }, 200);
+    var url = $('#syncUrl').value.trim();
+    Sync.apply(url, $('#syncRoom').value);
+    if (!url) { dlg.close(); return; }
+    setSyncStatus('연결하는 중…', null);
   });
 
   $('#btnSyncOff').addEventListener('click', function () { Sync.disconnect(); });
