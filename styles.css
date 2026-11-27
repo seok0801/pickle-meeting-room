@@ -750,6 +750,7 @@ input:focus, select:focus {
   .brand-badge svg { width: 29px; height: 29px; }
   .topbar-actions { width: 100%; }
   .room-chip { order: -2; flex: 1 1 auto; justify-content: center; padding-left: 10px; }
+  .room-chip-label { display: none; }
   .room-chip-name { max-width: 40vw; }
   .topbar-actions .btn { flex: 1 1 auto; text-align: center; padding: 9px 10px; font-size: 12.5px; }
   .sync-chip { flex: 1 1 100%; justify-content: center; order: -1; }
