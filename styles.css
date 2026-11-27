@@ -57,7 +57,7 @@ body {
   height: 100dvh;
   min-height: 100dvh;
   margin: 0 auto;
-  padding: clamp(12px, 2.4vw, 22px) clamp(12px, 2.4vw, 22px) calc(104px + env(safe-area-inset-bottom, 0px));
+  padding: clamp(12px, 2.4vw, 22px) clamp(12px, 2.4vw, 22px) calc(86px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: clamp(10px, 1.4vw, 16px);
@@ -761,19 +761,6 @@ input:focus, select:focus {
 }
 .chat-send { flex: 0 0 auto; padding: 10px 16px; }
 
-/* ---------- footer ---------- */
-.foot {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  font-size: 11.5px;
-  color: var(--ink-3);
-  padding: 4px 6px 10px;
-  line-height: 1.55;
-}
-.foot-dim { opacity: .85; }
-
 /* ---------- dialog ---------- */
 .dialog {
   border: 0;
@@ -924,7 +911,6 @@ input:focus, select:focus {
   .topbar-actions .btn { flex: 1 1 auto; text-align: center; padding: 9px 10px; font-size: 12.5px; }
   .sync-chip { flex: 1 1 100%; justify-content: center; order: -1; }
   .item-list { max-height: none; }
-  .foot { display: none; }
   .dock { width: calc(100vw - 24px); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); border-radius: 24px; }
   .item-form-row select { max-width: 45%; }
 }
