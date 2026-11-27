@@ -240,7 +240,10 @@ body {
 .view > .panel { display: none; }
 .view > .panel.is-active { display: flex; min-height: 0; }
 .panel-agenda.is-active,
-.panel-attend.is-active { overflow-y: auto; overscroll-behavior: contain; }
+.panel-attend.is-active { overflow-y: auto; overscroll-behavior: contain; flex: 1 1 auto; }
+.panel-agenda .item-list,
+.panel-attend .attend-list { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
+.panel-agenda .item-form { margin-top: auto; }
 
 /* ---------- floating dock ---------- */
 .dock {
