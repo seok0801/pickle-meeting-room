@@ -341,6 +341,7 @@
     var total = state.items.length;
     var done = state.items.filter(function (it) { return it.done; }).length;
     itemProgress.textContent = done + ' / ' + total + ' 완료';
+    renderDockBadges();
   }
 
   function short(t) { return t.length > 22 ? t.slice(0, 22) + '…' : t; }
@@ -505,6 +506,61 @@
     renderChat();
     input.focus();
   });
+
+  /* ------------------------------ 하단 독 3탭 ------------------------------ */
+
+  var PANEL_TABS = ['chat', 'agenda', 'attend'];
+  var currentTab = 'chat';
+  var dockButtons = Array.prototype.slice.call(document.querySelectorAll('.dock-btn'));
+
+  function panelOf(tab) {
+    return document.querySelector('.view > .panel[data-panel="' + tab + '"]');
+  }
+
+  // 채팅 → 안건 → 참가자 화면을 한 번에 하나씩 보여 줍니다. 기본 첫 화면은 채팅입니다.
+  function showTab(tab, focusInput) {
+    if (PANEL_TABS.indexOf(tab) < 0) tab = 'chat';
+    currentTab = tab;
+    PANEL_TABS.forEach(function (t) {
+      var p = panelOf(t);
+      if (!p) return;
+      var on = t === tab;
+      p.classList.toggle('is-active', on);
+      p.setAttribute('aria-hidden', on ? 'false' : 'true');
+    });
+    dockButtons.forEach(function (b) {
+      var on = b.dataset.tab === tab;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    if (tab === 'chat') {
+      renderChat();
+      requestAnimationFrame(function () { chatFeed.scrollTop = chatFeed.scrollHeight; });
+      if (focusInput) {
+        var box = $('#chatText');
+        if (box) box.focus();
+      }
+    }
+  }
+
+  dockButtons.forEach(function (b) {
+    b.addEventListener('click', function () { showTab(b.dataset.tab); });
+  });
+
+  // 독 배지 — 안건: 미완료 개수, 참가자: 출석 인원
+  function renderDockBadges() {
+    var openItems = state.items.filter(function (it) { return !it.done; }).length;
+    var bA = $('#badgeAgenda');
+    if (bA) {
+      bA.textContent = openItems;
+      bA.hidden = openItems === 0;
+    }
+    var bP = $('#badgeAttend');
+    if (bP) {
+      bP.textContent = state.pickles.length;
+      bP.hidden = state.pickles.length === 0;
+    }
+  }
 
   $('#formPickle').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -788,6 +844,7 @@
     lastChatId = null;   // 화면에 처음 나타날 때는 채팅 맨 아래부터 보여 줍니다
     renderRoomChip();
     renderAll();
+    showTab(currentTab);
   }
 
   function statusMessage(code) {

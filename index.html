@@ -7,7 +7,7 @@
 <meta name="description" content="귀여운 피클들이 함께 모여 회의하는 합동 회의실. 출석 보드, 회의 안건·할 일, 실시간 말풍선 채팅방.">
 <meta name="theme-color" content="#FFD84D">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css?v=20261128d">
+<link rel="stylesheet" href="styles.css?v=20261128e">
 </head>
 <body>
 <!-- ============ 초대 전용 잠금 화면 ============ -->
@@ -71,28 +71,27 @@
     </div>
   </header>
 
-  <main class="layout">
+  <main class="view" id="view">
 
-    <div class="col col-left">
-
-    <!-- ============ 출석 ============ -->
-    <section class="panel panel-attend" aria-labelledby="attendTitle">
+    <!-- ============ 채팅 (말풍선 대화) ============ -->
+    <section class="panel panel-chat is-active" id="panelChat" data-panel="chat" aria-labelledby="chatTitle">
       <div class="panel-head">
-        <h2 id="attendTitle">출석 피클</h2>
-        <p class="panel-sub"><span id="attendCount">0</span><span id="attendStatus"></span></p>
+        <h2 id="chatTitle">회의 채팅방</h2>
+        <p class="panel-sub"><span id="chatCount">0</span>개 메시지 · 실시간</p>
       </div>
 
-      <ul class="attend-list" id="attendList"></ul>
+      <div class="chat-feed" id="chatFeed" role="log" aria-live="polite" aria-relevant="additions" aria-label="회의 채팅 메시지"></div>
+      <p class="empty chat-empty" id="chatEmpty">아직 메시지가 없어요. 첫 메시지를 보내 보세요.</p>
 
-      <form class="inline-form" id="formPickle" autocomplete="off">
-        <label class="sr-only" for="pickleName">새 피클 이름</label>
-        <input id="pickleName" type="text" maxlength="16" placeholder="새 피클 이름" required>
-        <button type="submit" class="btn btn-primary btn-sm">출근</button>
+      <form class="chat-form" id="formChat" autocomplete="off">
+        <label class="sr-only" for="chatText">메시지</label>
+        <input id="chatText" type="text" maxlength="120" placeholder="메시지를 입력하고 Enter" required>
+        <button type="submit" class="btn btn-primary chat-send">전송</button>
       </form>
     </section>
 
-    <!-- ============ 안건/할 일 ============ -->
-    <section class="panel panel-agenda" aria-labelledby="agendaTitle">
+    <!-- ============ 안건 / 공동 할 일 ============ -->
+    <section class="panel panel-agenda" id="panelAgenda" data-panel="agenda" aria-labelledby="agendaTitle">
       <div class="panel-head">
         <h2 id="agendaTitle">회의 안건 &amp; 공동 할 일</h2>
         <p class="panel-sub"><span id="itemProgress">0 / 0 완료</span></p>
@@ -126,30 +125,41 @@
       </form>
     </section>
 
-    </div>
-
-    <div class="col col-chat">
-
-    <!-- ============ 채팅방 (말풍선 대화) ============ -->
-    <section class="panel panel-chat" aria-labelledby="chatTitle">
+    <!-- ============ 참가자 (출석 피클) ============ -->
+    <section class="panel panel-attend" id="panelAttend" data-panel="attend" aria-labelledby="attendTitle">
       <div class="panel-head">
-        <h2 id="chatTitle">회의 채팅방</h2>
-        <p class="panel-sub"><span id="chatCount">0</span>개 메시지 · 실시간</p>
+        <h2 id="attendTitle">출석 피클</h2>
+        <p class="panel-sub"><span id="attendCount">0</span><span id="attendStatus"></span></p>
       </div>
 
-      <div class="chat-feed" id="chatFeed" role="log" aria-live="polite" aria-relevant="additions" aria-label="회의 채팅 메시지"></div>
-      <p class="empty chat-empty" id="chatEmpty">아직 메시지가 없어요. 첫 메시지를 보내 보세요.</p>
+      <ul class="attend-list" id="attendList"></ul>
 
-      <form class="chat-form" id="formChat" autocomplete="off">
-        <label class="sr-only" for="chatText">메시지</label>
-        <input id="chatText" type="text" maxlength="120" placeholder="메시지를 입력하고 Enter" required>
-        <button type="submit" class="btn btn-primary chat-send">전송</button>
+      <form class="inline-form" id="formPickle" autocomplete="off">
+        <label class="sr-only" for="pickleName">새 피클 이름</label>
+        <input id="pickleName" type="text" maxlength="16" placeholder="새 피클 이름" required>
+        <button type="submit" class="btn btn-primary btn-sm">출근</button>
       </form>
     </section>
-
-    </div>
-
   </main>
+
+  <!-- ============ 하단 독 (3탭) ============ -->
+  <nav class="dock" aria-label="화면 전환">
+    <button type="button" class="dock-btn is-active" data-tab="chat" aria-controls="panelChat" aria-pressed="true">
+      <span class="dock-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 11.6a7.6 7.6 0 0 1-7.6 7.6H8.4l-4.1 3v-4.5A7.6 7.6 0 1 1 20 11.6Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></span>
+      <span class="dock-label">채팅</span>
+    </button>
+    <button type="button" class="dock-btn" data-tab="agenda" aria-controls="panelAgenda" aria-pressed="false">
+      <span class="dock-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4.5" y="4" width="15" height="16.5" rx="3.2" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8.4 8.6h7.2M8.4 12.4h7.2M8.4 16.2h4.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
+      <span class="dock-label">안건</span>
+      <span class="dock-badge" id="badgeAgenda" hidden>0</span>
+    </button>
+    <button type="button" class="dock-btn" data-tab="attend" aria-controls="panelAttend" aria-pressed="false">
+      <span class="dock-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9.2" cy="8.6" r="3.3" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M3.4 19.4c0-3.2 2.6-5.4 5.8-5.4s5.8 2.2 5.8 5.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M16.2 5.9a3.3 3.3 0 0 1 0 6.2M17.6 14.4c2.1.6 3.5 2.4 3.5 5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
+      <span class="dock-label">참가자</span>
+      <span class="dock-badge" id="badgeAttend" hidden>0</span>
+    </button>
+  </nav>
+
 
   <footer class="foot">
     <span>채팅과 회의 기록은 이 브라우저와 Firebase Realtime Database(초대받은 방)에 저장됩니다. 초대 링크를 받은 피클만 같은 회의실을 공유합니다.</span>
@@ -157,6 +167,6 @@
   </footer>
 </div>
 
-<script src="app.js?v=20261128d"></script>
+<script src="app.js?v=20261128e"></script>
 </body>
 </html>
