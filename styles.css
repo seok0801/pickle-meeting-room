@@ -134,6 +134,61 @@ body {
 
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
 
+/* ---------- room chip (현재 접속 중인 회의실) ---------- */
+.room-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 5px 6px 5px 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-sm);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.room-chip-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .01em;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.room-chip-name {
+  font-weight: 800;
+  color: var(--ink);
+  max-width: 30vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-chip[data-kind="private"] { border-color: #C6D6FF; background: #F7FAFF; }
+.room-chip[data-kind="private"] .room-chip-label { color: #1B47B8; }
+.room-chip[data-kind="private"] .room-chip-name { color: #1B47B8; }
+
+.room-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: #FFFDF8;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.room-copy svg { width: 12px; height: 12px; display: block; }
+.room-copy:hover { border-color: #D9C79E; color: var(--ink); }
+.room-copy.is-done { background: #EAFBF2; border-color: #BDEBD5; color: #0C7A4C; }
+.room-copy:focus-visible { outline: 3px solid rgba(47, 107, 255, .35); outline-offset: 2px; }
+
 /* ---------- buttons ---------- */
 .btn {
   font: inherit;
@@ -694,6 +749,8 @@ input:focus, select:focus {
   .brand-badge { width: 42px; height: 42px; border-radius: 14px; }
   .brand-badge svg { width: 29px; height: 29px; }
   .topbar-actions { width: 100%; }
+  .room-chip { order: -2; flex: 1 1 auto; justify-content: center; padding-left: 10px; }
+  .room-chip-name { max-width: 40vw; }
   .topbar-actions .btn { flex: 1 1 auto; text-align: center; padding: 9px 10px; font-size: 12.5px; }
   .sync-chip { flex: 1 1 100%; justify-content: center; order: -1; }
   .map-legend { font-size: 11px; gap: 10px; }

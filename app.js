@@ -4,9 +4,28 @@
 (function () {
   'use strict';
 
-  var KEY = 'pickle-meeting-room/v1';
+  var KEY_HEAD = 'pickle-meeting-room/v1';
   var CFG_KEY = 'pickle-meeting-room/sync';
   var MAX_TL = 60;
+  var DEMO_ROOM = 'pickle-room';
+
+  // ?room=<방ID> — 링크에 담긴 회의실로 바로 접속합니다(설정 창을 열 필요 없음).
+  // 회의실마다 localStorage 키를 따로 두어, 한 방의 내용이 다른 방이나 공용 데모로 새지 않습니다.
+  function sanitizeRoom(v) {
+    return String(v || '').replace(/[^\w\-가-힣]/g, '').slice(0, 40);
+  }
+
+  function readRoomParam() {
+    var m = /[?&]room=([^&#]*)/.exec(window.location.search);
+    if (!m) return '';
+    var raw = m[1].replace(/\+/g, ' ');
+    try { raw = decodeURIComponent(raw); } catch (e) { /* 원문 그대로 사용 */ }
+    return sanitizeRoom(raw);
+  }
+
+  var URL_ROOM = readRoomParam();
+  var IS_ROOM_LINK = !!URL_ROOM;
+  var KEY = KEY_HEAD + (IS_ROOM_LINK ? '/room/' + URL_ROOM : '');
 
   // 기본 실시간 동기화 주소 — 무료 Firebase Realtime Database(Spark 플랜 · 싱가포르 리전).
   // 이 주소가 미리 들어 있어 별도 설정 없이 여러 기기·피클이 같은 회의실을 공유합니다.
@@ -92,16 +111,31 @@
     };
   }
 
+  // ?room= 링크로 들어온 새 방의 초기 상태 — 데모 샘플을 넣지 않고 주봇만 앉혀 둡니다.
+  function blankState() {
+    return {
+      version: 1,
+      updatedAt: Date.now(),
+      pickles: [
+        { id: 'p-jubot', name: '주봇', role: '회의 진행', color: 0, status: 'online' }
+      ],
+      items: [],
+      timeline: []
+    };
+  }
+
+  function initialState() { return IS_ROOM_LINK ? blankState() : defaultState(); }
+
   var state = loadState();
 
   function loadState() {
     try {
       var raw = localStorage.getItem(KEY);
-      if (!raw) return defaultState();
+      if (!raw) return initialState();
       var s = JSON.parse(raw);
-      return normalize(s) || defaultState();
+      return normalize(s) || initialState();
     } catch (e) {
-      return defaultState();
+      return initialState();
     }
   }
 
@@ -701,13 +735,19 @@
   /* ------------------------------ 동기화 (Firebase RTDB) ------------------------------ */
 
   var Sync = (function () {
-    var cfg = { url: DEFAULT_SYNC.url, room: DEFAULT_SYNC.room, off: false };
+    var cfg = {
+      url: DEFAULT_SYNC.url,
+      room: IS_ROOM_LINK ? URL_ROOM : DEFAULT_SYNC.room,
+      off: false,
+      locked: IS_ROOM_LINK   // ?room= 링크로 들어온 방은 링크의 방에 고정
+    };
     var ctrl = null;
     var pollTimer = null;
     var pushTimer = null;
     var suppressUntil = 0;
 
     function loadCfg() {
+      if (cfg.locked) return;
       // 저장된 설정이 없으면 기본 주소로 바로 연결한다.
       try {
         var raw = localStorage.getItem(CFG_KEY);
@@ -716,10 +756,11 @@
         if (!c) return;
         if (c.off) { cfg.off = true; cfg.url = ''; return; }
         if (typeof c.url === 'string') cfg.url = c.url; // 빈 문자열이면 로컬 저장만
-        if (typeof c.room === 'string' && c.room) cfg.room = c.room;
+        if (typeof c.room === 'string' && c.room) cfg.room = sanitizeRoom(c.room) || cfg.room;
       } catch (e) { /* 무시 */ }
     }
     function saveCfg() {
+      if (cfg.locked) return;
       try { localStorage.setItem(CFG_KEY, JSON.stringify({ url: cfg.url, room: cfg.room, off: !!cfg.off })); } catch (e) { /* 무시 */ }
     }
 
@@ -900,32 +941,42 @@
         loadCfg();
         $('#syncUrl').value = cfg.url;
         $('#syncRoom').value = cfg.room;
+        if (cfg.locked) {
+          var b = $('#btnSync');
+          if (b) b.hidden = true;   // 링크의 방으로 고정되므로 설정 창을 열지 않는다
+        }
         if (cfg.url) {
           chip('connecting', '연결 중…');
           start();
         } else {
           chip('local', '로컬 저장');
         }
+        renderRoomChip();
       },
       apply: function (url, room) {
+        if (cfg.locked) return;
         cfg.off = false;
         cfg.url = normalizeUrl(url);
-        cfg.room = (room || 'pickle-room').replace(/[^\w\-가-힣]/g, '').slice(0, 40) || 'pickle-room';
+        cfg.room = sanitizeRoom(room) || DEMO_ROOM;
         saveCfg();
         $('#syncUrl').value = cfg.url;
         $('#syncRoom').value = cfg.room;
+        renderRoomChip();
         if (!cfg.url) { stop(); chip('local', '로컬 저장'); setSyncStatus('로컬 저장으로 돌아왔어요.', 'ok'); return; }
         start();
       },
       disconnect: function () {
+        if (cfg.locked) return;
         cfg.url = '';
         cfg.off = true;
         saveCfg();
         stop();
         chip('local', '로컬 저장');
         $('#syncUrl').value = '';
+        renderRoomChip();
         setSyncStatus('연결을 해제했어요. 이 브라우저에만 저장됩니다.', 'ok');
       },
+      room: function () { return cfg.room || DEMO_ROOM; },
       push: push
     };
   })();
@@ -936,6 +987,61 @@
     if (kind) n.dataset.kind = kind;
     else n.removeAttribute('data-kind');
   }
+
+  /* ------------------------------ 현재 회의실 표시 ------------------------------ */
+
+  // 공유 링크 — 비공개 회의실은 ?room=<방ID> 링크, 공용 데모는 기본 주소.
+  function shareUrl() {
+    var room = Sync.room() || DEMO_ROOM;
+    var base = window.location.origin + window.location.pathname;
+    if (room === DEMO_ROOM) return base;
+    return base + '?room=' + encodeURIComponent(room);
+  }
+
+  function renderRoomChip() {
+    var box = $('#roomChip');
+    if (!box) return;
+    var room = Sync.room() || DEMO_ROOM;
+    var isPrivate = room !== DEMO_ROOM;
+    box.dataset.kind = isPrivate ? 'private' : 'demo';
+    $('#roomChipLabel').textContent = isPrivate ? '비공개 회의실' : '공용 데모';
+    $('#roomChipName').textContent = room;
+    box.title = (isPrivate ? '링크를 받은 사람만 함께 쓰는 회의실' : '누구나 들어올 수 있는 공용 데모 회의실') + ' · ' + room;
+  }
+
+  function legacyCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+
+  $('#btnCopyRoom').addEventListener('click', function () {
+    var url = shareUrl();
+    var btn = $('#btnCopyRoom');
+    var label = $('#btnCopyRoomText');
+    var done = function (ok) {
+      label.textContent = ok ? '복사됨' : '복사 실패';
+      btn.classList.toggle('is-done', ok);
+      setTimeout(function () {
+        label.textContent = '복사';
+        btn.classList.remove('is-done');
+      }, 1800);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () { done(true); }, function () { done(legacyCopy(url)); });
+    } else {
+      done(legacyCopy(url));
+    }
+  });
 
   /* ------------------------------ 동기화 UI ------------------------------ */
 
