@@ -8,6 +8,14 @@
   var CFG_KEY = 'pickle-meeting-room/sync';
   var MAX_TL = 60;
 
+  // 기본 실시간 동기화 주소 — 무료 Firebase Realtime Database(Spark 플랜 · 싱가포르 리전).
+  // 이 주소가 미리 들어 있어 별도 설정 없이 여러 기기·피클이 같은 회의실을 공유합니다.
+  // 설정 창에서 다른 주소로 바꾸거나 '연결 해제'로 로컬 저장만 쓸 수 있습니다.
+  var DEFAULT_SYNC = {
+    url: 'https://pickle-meeting-room-rtdb-default-rtdb.asia-southeast1.firebasedatabase.app',
+    room: 'pickle-room'
+  };
+
   /* ------------------------------ 팔레트 / 좌석 ------------------------------ */
 
   // 0번은 주봇 전용(노란 몸통 + 파란 귀/테두리)
@@ -693,23 +701,26 @@
   /* ------------------------------ 동기화 (Firebase RTDB) ------------------------------ */
 
   var Sync = (function () {
-    var cfg = { url: '', room: 'pickle-room' };
+    var cfg = { url: DEFAULT_SYNC.url, room: DEFAULT_SYNC.room, off: false };
     var ctrl = null;
     var pollTimer = null;
     var pushTimer = null;
     var suppressUntil = 0;
 
     function loadCfg() {
+      // 저장된 설정이 없으면 기본 주소로 바로 연결한다.
       try {
         var raw = localStorage.getItem(CFG_KEY);
         if (!raw) return;
         var c = JSON.parse(raw);
-        if (c && typeof c.url === 'string') cfg.url = c.url;
-        if (c && typeof c.room === 'string' && c.room) cfg.room = c.room;
+        if (!c) return;
+        if (c.off) { cfg.off = true; cfg.url = ''; return; }
+        if (typeof c.url === 'string') cfg.url = c.url; // 빈 문자열이면 로컬 저장만
+        if (typeof c.room === 'string' && c.room) cfg.room = c.room;
       } catch (e) { /* 무시 */ }
     }
     function saveCfg() {
-      try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) { /* 무시 */ }
+      try { localStorage.setItem(CFG_KEY, JSON.stringify({ url: cfg.url, room: cfg.room, off: !!cfg.off })); } catch (e) { /* 무시 */ }
     }
 
     function normalizeUrl(input) {
@@ -817,7 +828,7 @@
         return;
       }
       if (!res.body) { startPolling(false); return; }
-      chip('online', '실시간 연결됨');
+      chip('online', '실시간 동기화');
       setSyncStatus('실시간 연결됨 · 회의실 “' + cfg.room + '”', 'ok');
       var reader = res.body.getReader();
       var dec = new TextDecoder();
@@ -897,6 +908,7 @@
         }
       },
       apply: function (url, room) {
+        cfg.off = false;
         cfg.url = normalizeUrl(url);
         cfg.room = (room || 'pickle-room').replace(/[^\w\-가-힣]/g, '').slice(0, 40) || 'pickle-room';
         saveCfg();
@@ -907,6 +919,7 @@
       },
       disconnect: function () {
         cfg.url = '';
+        cfg.off = true;
         saveCfg();
         stop();
         chip('local', '로컬 저장');
