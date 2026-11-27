@@ -10,7 +10,34 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="app">
+<!-- ============ 초대 전용 잠금 화면 ============ -->
+<section class="lock" id="lockScreen" aria-labelledby="lockTitle">
+  <div class="lock-card">
+    <span class="lock-badge" aria-hidden="true">
+      <svg viewBox="0 0 100 104"><ellipse cx="22" cy="26" rx="12" ry="12" fill="#2F6BFF"/><ellipse cx="78" cy="26" rx="12" ry="12" fill="#2F6BFF"/><rect x="14" y="28" width="72" height="64" rx="30" fill="#FFD84D" stroke="#2F6BFF" stroke-width="5"/><ellipse cx="38" cy="60" rx="5" ry="6.5" fill="#2A2418"/><ellipse cx="62" cy="60" rx="5" ry="6.5" fill="#2A2418"/><path d="M44 76 q6 6 12 0" stroke="#2A2418" stroke-width="3" fill="none" stroke-linecap="round"/></svg>
+    </span>
+    <p class="lock-kicker">🔒 초대 전용 비공개 회의실</p>
+    <h1 id="lockTitle">피클 합동 회의실</h1>
+    <p class="lock-lead">대장님의 초대 링크 또는 방 ID·초대 키를 입력해야 입장할 수 있습니다.</p>
+
+    <form class="lock-form" id="formLock" autocomplete="off">
+      <label class="field">
+        <span>방 ID</span>
+        <input id="lockRoom" type="text" maxlength="40" placeholder="rm_..." spellcheck="false" autocapitalize="off" required>
+      </label>
+      <label class="field">
+        <span>초대 키</span>
+        <input id="lockKey" type="password" maxlength="64" placeholder="inv_..." spellcheck="false" autocapitalize="off" required>
+      </label>
+      <button type="submit" class="btn btn-primary lock-submit" id="btnLockEnter">입장</button>
+    </form>
+
+    <p class="lock-status" id="lockStatus" role="status"></p>
+    <p class="lock-foot">초대 링크를 받았다면 그 링크로 열면 바로 입장됩니다. 초대 없이는 어떤 방 데이터도 보이지 않습니다.</p>
+  </div>
+</section>
+
+<div class="app" id="appRoot" hidden>
 
   <header class="topbar">
     <div class="brand">
@@ -24,10 +51,10 @@
     </div>
 
     <div class="topbar-actions">
-      <div class="room-chip" id="roomChip" data-kind="demo">
-        <span class="room-chip-label" id="roomChipLabel">공용 데모</span>
-        <strong class="room-chip-name" id="roomChipName">pickle-room</strong>
-        <button type="button" class="room-copy" id="btnCopyRoom" title="회의실 공유 링크 복사">
+      <div class="room-chip" id="roomChip" data-kind="private">
+        <span class="room-chip-label" id="roomChipLabel">초대 전용</span>
+        <strong class="room-chip-name" id="roomChipName">—</strong>
+        <button type="button" class="room-copy" id="btnCopyRoom" title="방 ID·초대 키가 담긴 초대 링크 복사">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <rect x="9" y="9" width="12" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2.2"/>
             <path d="M6 15H5.5A2.5 2.5 0 0 1 3 12.5v-7A2.5 2.5 0 0 1 5.5 3h7A2.5 2.5 0 0 1 15 5.5V6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
@@ -38,7 +65,6 @@
       <span class="sync-chip" id="syncChip" data-state="local" title="동기화 상태">
         <span class="dot" aria-hidden="true"></span><span id="syncChipText">로컬 저장</span>
       </span>
-      <button type="button" class="btn btn-ghost" id="btnSync">실시간 동기화 설정</button>
       <button type="button" class="btn btn-ghost" id="btnExport">JSON 내보내기</button>
       <button type="button" class="btn btn-ghost" id="btnImport">불러오기</button>
       <input type="file" id="fileImport" accept="application/json,.json" hidden>
@@ -236,36 +262,10 @@
   </main>
 
   <footer class="foot">
-    <span>데이터는 이 브라우저에 저장됩니다. 실시간 동기화를 켜면 Firebase Realtime Database로 여러 기기가 같은 회의실을 공유합니다.</span>
-    <span class="foot-dim">예시 데이터만 들어 있습니다 · 개인정보 없음</span>
+    <span>데이터는 이 브라우저와 Firebase Realtime Database(초대받은 방)에 저장됩니다. 초대 링크를 받은 피클만 같은 회의실을 공유합니다.</span>
+    <span class="foot-dim">초대 전용 비공개 회의실</span>
   </footer>
 </div>
-
-<!-- ============ 동기화 설정 ============ -->
-<dialog id="dlgSync" class="dialog">
-  <form method="dialog" class="dialog-body" id="formSync">
-    <h2>실시간 동기화 설정</h2>
-    <p class="dialog-lead">기본 실시간 동기화 주소가 미리 들어 있어, 그대로 두면 여러 피클·기기가 같은 회의실을 실시간으로 공유합니다. 다른 주소로 바꾸거나, 비워 두면 이 브라우저에만 저장됩니다.</p>
-
-    <label class="field">
-      <span>Database URL</span>
-      <input id="syncUrl" type="url" inputmode="url" placeholder="https://my-room-default-rtdb.firebaseio.com" spellcheck="false">
-    </label>
-
-    <label class="field">
-      <span>회의실 ID</span>
-      <input id="syncRoom" type="text" maxlength="40" placeholder="pickle-room" spellcheck="false">
-    </label>
-
-    <p class="dialog-note">공개 읽기/쓰기 규칙으로 열린 무료 데이터베이스입니다. 실제 개인정보는 올리지 마세요.<br>비공개 회의실은 <code>?room=&lt;방 ID&gt;</code> 링크로 들어오며, 링크로 접속한 방은 링크의 방으로 고정됩니다.</p>
-
-    <div class="dialog-actions">
-      <button type="button" class="btn btn-ghost" id="btnSyncOff">연결 해제</button>
-      <button type="submit" class="btn btn-primary" id="btnSyncApply">연결</button>
-    </div>
-    <p class="dialog-status" id="syncStatus" role="status"></p>
-  </form>
-</dialog>
 
 <script src="app.js"></script>
 </body>

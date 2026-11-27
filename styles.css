@@ -60,6 +60,7 @@ body {
   flex-direction: column;
   gap: clamp(14px, 1.6vw, 20px);
 }
+.app[hidden] { display: none; }
 
 /* ---------- topbar ---------- */
 .topbar {
@@ -719,6 +720,104 @@ input:focus, select:focus {
 .dialog-status { margin: 0; font-size: 12px; font-weight: 700; color: var(--ink-3); min-height: 1em; }
 .dialog-status[data-kind="ok"] { color: #0C7A4C; }
 .dialog-status[data-kind="error"] { color: #A3271B; }
+
+/* ---------- 잠금 화면 (초대 전용) ---------- */
+.lock {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(18px, 5vw, 48px) clamp(14px, 4vw, 32px);
+}
+.lock[hidden] { display: none; }
+.lock-card {
+  width: 100%;
+  max-width: 430px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  padding: clamp(22px, 5vw, 34px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+.lock-badge {
+  width: 66px;
+  height: 66px;
+  border-radius: 21px;
+  background: #FFF3CF;
+  border: 2px solid #FFE28F;
+  display: grid;
+  place-items: center;
+}
+.lock-badge svg { width: 40px; height: 40px; display: block; }
+.lock-kicker {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: .2px;
+  color: var(--ink-2);
+}
+.lock-card h1 {
+  margin: 0;
+  font-size: clamp(20px, 5vw, 24px);
+  letter-spacing: -.4px;
+}
+.lock-lead {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  word-break: keep-all;
+}
+.lock-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+  text-align: left;
+}
+.lock-form input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--cream-2);
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+}
+.lock-form input:focus {
+  outline: none;
+  border-color: #9DBDFF;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(47, 107, 255, .12);
+}
+.lock-submit { width: 100%; margin-top: 2px; }
+.lock-status {
+  margin: 2px 0 0;
+  min-height: 1.1em;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-3);
+  line-height: 1.5;
+  word-break: keep-all;
+}
+.lock-status[data-kind="error"] { color: #A3271B; }
+.lock-status[data-kind="ok"] { color: #0C7A4C; }
+.lock-foot {
+  margin: 6px 0 0;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-2);
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.6;
+  word-break: keep-all;
+}
 
 /* ---------- responsive ---------- */
 @media (min-width: 700px) {

@@ -7,43 +7,37 @@
 
 ## 기능
 
+- **초대 전용 잠금** — 방 ID와 초대 키가 없는 기본 주소로 열면 회의실 대신 잠금 화면
+  (“초대 전용 비공개 회의실 — 대장님의 초대 링크 또는 방 ID·초대 키를 입력해야 입장할 수 있습니다”)이 뜨고,
+  방 데이터는 하나도 내려받지 않습니다. 잠금 화면의 입력 폼으로 방 ID·초대 키를 직접 넣어도 입장할 수 있습니다.
+- **초대 링크(`?room=<방 ID>&key=<초대 키>`)** — 이 링크로 열면 잠금 화면 없이 바로 그 방에 연결됩니다.
+  상단 회의실 칩의 **복사** 버튼이 방 ID와 초대 키가 함께 든 전체 초대 링크를 복사합니다.
+  저장(localStorage)도 방 ID + 초대 키마다 따로 쓰여, 한 방의 내용이 다른 방으로 섞이지 않습니다.
+- **키가 틀리면 입장 불가** — 초대 키가 틀렸거나 데이터베이스가 읽기를 거부(401/403)하면 방에 들어가지 못하고 잠금 화면에 오류가 표시됩니다.
 - **피클 오피스 맵 (SVG)** — 회의실(원탁 테이블) · 작업실(책상·화이트보드) · 라운지(소파) 세 구역.
   둥근 노란 몸통과 파란 귀/테두리의 주봇을 포함한 피클 캐릭터들이 자리에서 움직이고, 짧은 말풍선으로 인사합니다.
   (말풍선을 누르면 인사를 건넵니다.)
 - **출석 피클 보드** — 참석한 피클 목록, 각자의 상태(온라인 / 작업중 / 대기) 변경, 새 피클 출근.
 - **회의 안건 & 공동 할 일** — 안건·할 일 추가, 완료 체크, 전체/안건/할 일/미완료 필터, 담당 지정.
 - **회의 타임라인** — 피클들의 의견 교환과 직접 남긴 메모가 시간순으로 쌓입니다.
-- **실시간 동기화(기본 켜짐)** — 무료 Firebase Realtime Database 주소가 앱에 미리 들어 있어, 주소를 넣지 않아도
-  여러 기기·피클이 같은 회의실(`rooms/pickle-room`)을 실시간(SSE 스트림)으로 공유합니다. 스트림이 막히면 자동으로 폴링으로 전환합니다.
-  상단 **실시간 동기화 설정**에서 다른 주소·회의실 ID로 바꿀 수 있고, **연결 해제**를 누르면 이 브라우저에만 저장됩니다.
-- **회의실 링크(`?room=<방 ID>`)** — `?room=` 없이 열면 공용 데모 회의실(`pickle-room`)입니다.
-  `https://seok0801.github.io/pickle-meeting-room/?room=<방 ID>` 처럼 방 ID를 붙여 열면 설정 창을 열지 않아도
-  그 방(`rooms/<방 ID>`)에 바로 연결되고, 상단에 현재 회의실 이름과 **복사** 버튼이 나옵니다.
-  방 ID는 링크를 아는 사람만 알 수 있으므로, 방 ID는 저장소에 적지 말고 링크로만 나눠 주세요.
-  저장(localStorage)도 방마다 따로 쓰여 한 방의 내용이 다른 방으로 섞이지 않습니다.
+- **실시간 동기화** — 같은 방에 초대받아 들어온 기기·피클끼리 SSE 스트림으로 실시간 공유하고, 스트림이 끊기면 자동으로 폴링으로 전환합니다.
 - **반응형** — 375px 모바일 / 태블릿 / 데스크탑 레이아웃, 가로 넘침 없음. `prefers-reduced-motion` 존중.
 
-## 실시간 동기화
+## 동기화 · 초대 전용 데이터 구조
 
-기본값은 아래와 같고 `app.js`의 `DEFAULT_SYNC`에 있습니다.
-
-```js
-var DEFAULT_SYNC = {
-  url: 'https://pickle-meeting-room-rtdb-default-rtdb.asia-southeast1.firebasedatabase.app',
-  room: 'pickle-room'
-};
-```
-
-- Firebase 프로젝트: `pickle-meeting-room` (요금제 **Spark / 무료 $0**, 카드 미연결)
-- Realtime Database 리전: 싱가포르(asia-southeast1), 데이터 경로 `rooms/<회의실 ID>`
-- 보안 규칙: `rooms` 아래만 읽기/쓰기를 열고, 회의실 키 형식과 필드 존재·길이를 검사합니다.
+- Firebase 프로젝트: `pickle-meeting-room-rtdb` (요금제 **Spark / 무료 $0**, 카드 미연결)
+- Realtime Database 리전: 싱가포르(asia-southeast1)
+- 데이터 경로: **`rooms/<방 ID>/<초대 키>`** — 초대 키가 경로에 들어 있어야만 규칙을 통과합니다.
+- 보안 규칙: 루트 · `rooms` · `rooms/<방 ID>`는 읽기/쓰기를 모두 닫아 두어 전체 방 목록(`rooms.json`)이나
+  방 단위(`rooms/<방 ID>.json`) 조회를 401로 막고, `rooms/<방 ID>/<초대 키>`에서만 필드 존재·길이를 검증한 뒤 통과시킵니다.
+  규칙 본문은 공개되지 않습니다(비로그인 `GET /.settings/rules.json` → 403).
 
 ```json
-{"rules":{"rooms":{"$room":{".read":true,".write":true,".validate":"$room.matches(/^[A-Za-z0-9가-힣_-]{1,40}$/)","version":{".validate":"newData.isNumber()"},"updatedAt":{".validate":"newData.isNumber()"},"pickles":{"$id":{".validate":"newData.hasChildren(['name']) && newData.child('name').val().length <= 24"}},"items":{"$id":{".validate":"newData.hasChildren(['title']) && newData.child('title').val().length <= 160"}},"timeline":{"$id":{".validate":"newData.hasChildren(['text']) && newData.child('text').val().length <= 400"}},"$other":{".validate":false}}}}}
+{"rules":{".read":false,".write":false,"rooms":{".read":false,".write":false,"$roomId":{".read":false,".write":false,"$inviteKey":{".read":"<초대 키 일치 검사>",".write":"<초대 키 일치 검사>",".validate":"newData.hasChildren(['version','updatedAt'])","version":{".validate":"newData.isNumber()"},"updatedAt":{".validate":"newData.isNumber()"},"pickles":{"$id":{".validate":"newData.hasChildren(['name']) && newData.child('name').val().length <= 24"}},"items":{"$id":{".validate":"newData.hasChildren(['title']) && newData.child('title').val().length <= 160"}},"timeline":{"$id":{".validate":"newData.hasChildren(['text']) && newData.child('text').val().length <= 400"}},"$other":{".validate":false}}}}}}
 ```
 
-> ⚠️ 규칙이 공개라 주소를 아는 사람은 누구나 이 회의실을 읽고 쓸 수 있습니다. 실제 개인정보·민감정보는 올리지 마세요.
-> 비공개 회의실도 같은 규칙을 쓰므로, 방 ID(링크)를 아는 사람은 그 방을 읽고 쓸 수 있습니다. 링크는 필요한 사람에게만 보내세요.
+> 🔒 실제 방 ID와 초대 키는 이 저장소·커밋·README에 적지 않습니다. 초대 링크로만 나눠 주고,
+> 키를 교체하면(콘솔 규칙의 키 상수를 바꾸고 새 경로로 데이터를 옮기면) 기존 초대 링크는 즉시 401로 회수됩니다.
 
 ## 배포
 
@@ -52,4 +46,4 @@ var DEFAULT_SYNC = {
 
 ## 데이터
 
-샘플 데이터는 모두 범용 예시입니다. 개인정보는 포함되어 있지 않습니다.
+데이터는 초대받은 방(`rooms/<방 ID>/<초대 키>`)에만 있고, 초대 없이는 어떤 방 데이터도 보이지 않습니다.

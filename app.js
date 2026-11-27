@@ -4,36 +4,42 @@
 (function () {
   'use strict';
 
-  var KEY_HEAD = 'pickle-meeting-room/v1';
-  var CFG_KEY = 'pickle-meeting-room/sync';
+  var KEY_HEAD = 'pickle-meeting-room/v2';
   var MAX_TL = 60;
-  var DEMO_ROOM = 'pickle-room';
+  var MIN_KEY_LEN = 20;   // RTDB 규칙과 같은 초대 키 최소 길이
 
-  // ?room=<방ID> — 링크에 담긴 회의실로 바로 접속합니다(설정 창을 열 필요 없음).
-  // 회의실마다 localStorage 키를 따로 두어, 한 방의 내용이 다른 방이나 공용 데모로 새지 않습니다.
+  // 무료 Firebase Realtime Database(Spark 플랜 · 싱가포르 리전) — 주소만 미리 넣어 둡니다.
+  // 데이터는 rooms/<방 ID>/<초대 키> 경로에만 있고, 초대 키를 모르면 읽지도 쓰지도 못합니다.
+  var RTDB_URL = 'https://pickle-meeting-room-rtdb-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+  // 초대 전용: 기본 주소로 들어오면 회의실 대신 잠금 화면을 띄우고,
+  // ?room=<방 ID>&key=<초대 키> 초대 링크로만 입장합니다.
   function sanitizeRoom(v) {
     return String(v || '').replace(/[^\w\-가-힣]/g, '').slice(0, 40);
   }
+  function sanitizeKey(v) {
+    return String(v || '').replace(/[^\w\-]/g, '').slice(0, 64);
+  }
 
-  function readRoomParam() {
-    var m = /[?&]room=([^&#]*)/.exec(window.location.search);
+  function readParam(name) {
+    var m = new RegExp('[?&]' + name + '=([^&#]*)').exec(window.location.search);
     if (!m) return '';
     var raw = m[1].replace(/\+/g, ' ');
     try { raw = decodeURIComponent(raw); } catch (e) { /* 원문 그대로 사용 */ }
-    return sanitizeRoom(raw);
+    return raw;
   }
 
-  var URL_ROOM = readRoomParam();
-  var IS_ROOM_LINK = !!URL_ROOM;
-  var KEY = KEY_HEAD + (IS_ROOM_LINK ? '/room/' + URL_ROOM : '');
+  var INVITE = { room: sanitizeRoom(readParam('room')), key: sanitizeKey(readParam('key')) };
 
-  // 기본 실시간 동기화 주소 — 무료 Firebase Realtime Database(Spark 플랜 · 싱가포르 리전).
-  // 이 주소가 미리 들어 있어 별도 설정 없이 여러 기기·피클이 같은 회의실을 공유합니다.
-  // 설정 창에서 다른 주소로 바꾸거나 '연결 해제'로 로컬 저장만 쓸 수 있습니다.
-  var DEFAULT_SYNC = {
-    url: 'https://pickle-meeting-room-rtdb-default-rtdb.asia-southeast1.firebasedatabase.app',
-    room: 'pickle-room'
-  };
+  function hasInvite() { return INVITE.room.length > 0 && INVITE.key.length >= MIN_KEY_LEN; }
+
+  // 방(ID) + 초대 키마다 localStorage를 따로 써서, 방의 내용이 다른 방으로 새지 않게 합니다.
+  function stateKey() { return KEY_HEAD + '/room/' + INVITE.room + '/' + INVITE.key; }
+
+  function inviteUrl(room, key) {
+    return window.location.origin + window.location.pathname +
+      '?room=' + encodeURIComponent(room) + '&key=' + encodeURIComponent(key);
+  }
 
   /* ------------------------------ 팔레트 / 좌석 ------------------------------ */
 
@@ -85,33 +91,7 @@
     return (prefix || 'id') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
   }
 
-  function defaultState() {
-    var now = Date.now();
-    return {
-      version: 1,
-      updatedAt: now,
-      pickles: [
-        { id: 'p-jubot', name: '주봇', role: '회의 진행', color: 0, status: 'online' },
-        { id: 'p-guest', name: '게스트 피클', role: '방문 피클', color: 2, status: 'online' },
-        { id: 'p-mint', name: '민트', role: '기록 담당', color: 1, status: 'working' },
-        { id: 'p-lilac', name: '라일락', role: '자료 조사', color: 3, status: 'working' },
-        { id: 'p-coral', name: '코랄', role: '라운지 담당', color: 4, status: 'away' }
-      ],
-      items: [
-        { id: 'i-1', title: '오늘의 안건: 주말 나들이', type: 'agenda', done: false, owner: '주봇', ts: now - 3600e3 },
-        { id: 'i-2', title: '오늘의 안건: 장보기 리스트', type: 'agenda', done: false, owner: '게스트 피클', ts: now - 3400e3 },
-        { id: 'i-3', title: '회의실 화이트보드 정리', type: 'todo', done: false, owner: '민트', ts: now - 3000e3 },
-        { id: 'i-4', title: '라운지 간식 채워 두기', type: 'todo', done: true, owner: '코랄', ts: now - 2600e3 }
-      ],
-      timeline: [
-        { id: 't-1', who: '주봇', text: '오늘 회의 시작합니다. 안건 두 개 먼저 볼게요.', ts: now - 2400e3, kind: 'pickle' },
-        { id: 't-2', who: '게스트 피클', text: '주말 나들이는 토요일 오전이 좋을 것 같아요.', ts: now - 1800e3, kind: 'pickle' },
-        { id: 't-3', who: '나', text: '장보기 리스트는 내가 정리해 둘게.', ts: now - 900e3, kind: 'note' }
-      ]
-    };
-  }
-
-  // ?room= 링크로 들어온 새 방의 초기 상태 — 데모 샘플을 넣지 않고 주봇만 앉혀 둡니다.
+  // 초대받은 방의 초기 상태 — 데모 샘플을 넣지 않고 주봇만 앉혀 둡니다.
   function blankState() {
     return {
       version: 1,
@@ -124,18 +104,17 @@
     };
   }
 
-  function initialState() { return IS_ROOM_LINK ? blankState() : defaultState(); }
-
-  var state = loadState();
+  var state = blankState();
 
   function loadState() {
+    if (!INVITE.room || !INVITE.key) return blankState();
     try {
-      var raw = localStorage.getItem(KEY);
-      if (!raw) return initialState();
+      var raw = localStorage.getItem(stateKey());
+      if (!raw) return blankState();
       var s = JSON.parse(raw);
-      return normalize(s) || initialState();
+      return normalize(s) || blankState();
     } catch (e) {
-      return initialState();
+      return blankState();
     }
   }
 
@@ -183,9 +162,10 @@
   }
 
   function save() {
+    if (!INVITE.room || !INVITE.key) return;   // 초대 없이 열린 잠금 화면에서는 아무것도 저장하지 않는다
     state.updatedAt = Date.now();
     trimTimeline();
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 용량 초과 등 */ }
+    try { localStorage.setItem(stateKey(), JSON.stringify(state)); } catch (e) { /* 용량 초과 등 */ }
     Sync.push();
   }
 
@@ -735,52 +715,20 @@
   /* ------------------------------ 동기화 (Firebase RTDB) ------------------------------ */
 
   var Sync = (function () {
-    var cfg = {
-      url: DEFAULT_SYNC.url,
-      room: IS_ROOM_LINK ? URL_ROOM : DEFAULT_SYNC.room,
-      off: false,
-      locked: IS_ROOM_LINK   // ?room= 링크로 들어온 방은 링크의 방에 고정
-    };
+    var cfg = { url: RTDB_URL, room: '', key: '' };
     var ctrl = null;
     var pollTimer = null;
     var pushTimer = null;
     var suppressUntil = 0;
 
-    function loadCfg() {
-      if (cfg.locked) return;
-      // 저장된 설정이 없으면 기본 주소로 바로 연결한다.
-      try {
-        var raw = localStorage.getItem(CFG_KEY);
-        if (!raw) return;
-        var c = JSON.parse(raw);
-        if (!c) return;
-        if (c.off) { cfg.off = true; cfg.url = ''; return; }
-        if (typeof c.url === 'string') cfg.url = c.url; // 빈 문자열이면 로컬 저장만
-        if (typeof c.room === 'string' && c.room) cfg.room = sanitizeRoom(c.room) || cfg.room;
-      } catch (e) { /* 무시 */ }
-    }
-    function saveCfg() {
-      if (cfg.locked) return;
-      try { localStorage.setItem(CFG_KEY, JSON.stringify({ url: cfg.url, room: cfg.room, off: !!cfg.off })); } catch (e) { /* 무시 */ }
-    }
-
-    function normalizeUrl(input) {
-      var v = String(input || '').trim();
-      if (!v) return '';
-      if (!/^https?:\/\//i.test(v)) {
-        if (v.indexOf('.') === -1) v = v + '-default-rtdb.firebaseio.com';
-        v = 'https://' + v;
-      }
-      return v.replace(/\/+$/, '');
-    }
-
+    // rooms/<방 ID>/<초대 키> — 초대 키가 경로에 들어 있어야만 규칙을 통과합니다.
     function endpoint() {
-      if (!cfg.url) return '';
-      return cfg.url + '/rooms/' + encodeURIComponent(cfg.room) + '.json';
+      return cfg.url + '/rooms/' + encodeURIComponent(cfg.room) + '/' + encodeURIComponent(cfg.key) + '.json';
     }
 
     function chip(stateName, text) {
       var chipEl = $('#syncChip');
+      if (!chipEl) return;
       chipEl.dataset.state = stateName;
       $('#syncChipText').textContent = text;
     }
@@ -788,6 +736,7 @@
     function stop() {
       if (ctrl) { try { ctrl.abort(); } catch (e) {} ctrl = null; }
       if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
     }
 
     function applyRemote(remote, force) {
@@ -796,30 +745,30 @@
       if (!force && s.updatedAt > 0 && s.updatedAt <= state.updatedAt) return;
       state = s;
       suppressUntil = Date.now() + 1500;
-      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+      try { localStorage.setItem(stateKey(), JSON.stringify(state)); } catch (e) {}
       renderAll();
     }
 
-    // 연결 직후 1회: 방에 이미 데이터가 있으면 그것을 받아들이고, 비어 있으면 올린다.
-    async function adoptInitial() {
-      try {
-        var r = await fetch(endpoint(), { cache: 'no-store' });
-        if (!r.ok) {
-          chip('error', '연결 실패 (' + r.status + ')');
-          setSyncStatus('연결 실패: HTTP ' + r.status + ' — 데이터베이스 규칙에서 읽기/쓰기를 허용했는지 확인해 주세요.', 'error');
-          return false;
+    // 입장 직전 1회: 키가 맞는지 확인하고, 이미 있는 방 데이터를 받아옵니다.
+    // 401/403 이면 초대 키가 틀린 것이므로 입장을 막습니다.
+    function adoptInitial() {
+      return fetch(endpoint(), { cache: 'no-store' }).then(function (r) {
+        if (r.status === 401 || r.status === 403) {
+          var denied = new Error('초대 키가 올바르지 않습니다');
+          denied.code = r.status;
+          throw denied;
         }
-        var data = await r.json();
-        if (data) { applyRemote(data, true); }
-        else { push(true); }
-        var d = $('#dlgSync');
-        if (d && d.open) d.close();
+        if (!r.ok) {
+          var failed = new Error('연결 실패');
+          failed.code = r.status;
+          throw failed;
+        }
+        return r.json();
+      }).then(function (data) {
+        if (data) applyRemote(data, true);
+        else push(true);
         return true;
-      } catch (e) {
-        chip('error', '연결 실패');
-        setSyncStatus('연결할 수 없어요. 주소와 네트워크를 확인해 주세요.', 'error');
-        return false;
-      }
+      });
     }
 
     function handleEvent(raw) {
@@ -848,8 +797,6 @@
       if (!url) return;
       ctrl = new AbortController();
       chip('connecting', '연결 중…');
-      var ok = await adoptInitial();
-      if (!ok) return;
       var res;
       try {
         res = await fetch(url, {
@@ -858,19 +805,16 @@
           signal: ctrl.signal
         });
       } catch (e) {
+        if (ctrl && ctrl.signal.aborted) return;
         chip('error', '연결 실패');
-        setSyncStatus('연결할 수 없어요. 주소를 확인해 주세요.', 'error');
         return;
       }
       if (!res.ok) {
-        var msg = 'HTTP ' + res.status;
         chip('error', '연결 실패 (' + res.status + ')');
-        setSyncStatus('연결 실패: ' + msg + ' — 데이터베이스 규칙에서 읽기/쓰기를 허용했는지 확인해 주세요.', 'error');
         return;
       }
-      if (!res.body) { startPolling(false); return; }
+      if (!res.body) { startPolling(); return; }
       chip('online', '실시간 동기화');
-      setSyncStatus('실시간 연결됨 · 회의실 “' + cfg.room + '”', 'ok');
       var reader = res.body.getReader();
       var dec = new TextDecoder();
       var buf = '';
@@ -890,12 +834,11 @@
         if (ctrl && ctrl.signal.aborted) return;
       }
       // 스트림이 끝나면 폴링으로 대체
-      startPolling(false);
+      startPolling();
     }
 
-    function startPolling(quiet) {
+    function startPolling() {
       if (pollTimer || !cfg.url) return;
-      if (!quiet) chip('connecting', '동기화 중(폴링)');
       pollTimer = setInterval(async function () {
         try {
           var r = await fetch(endpoint(), { cache: 'no-store' });
@@ -903,7 +846,7 @@
           var data = await r.json();
           if (data) {
             applyRemote(data);
-            if (!quiet) chip('online', '동기화 중(폴링)');
+            chip('online', '동기화 중(폴링)');
           } else {
             push(true);
           }
@@ -913,14 +856,8 @@
       }, 5000);
     }
 
-    function start() {
-      stop();
-      if (!cfg.url) { chip('local', '로컬 저장'); return; }
-      connectStream();
-    }
-
     function push(force) {
-      if (!cfg.url) return;
+      if (!cfg.url || !cfg.room || !cfg.key) return;
       if (!force && Date.now() < suppressUntil) return;
       if (pushTimer) clearTimeout(pushTimer);
       pushTimer = setTimeout(function () {
@@ -929,84 +866,129 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(state)
         }).then(function (r) {
-          if (!r.ok) setSyncStatus('저장 실패 (HTTP ' + r.status + ') — 쓰기 권한을 확인해 주세요.', 'error');
+          if (!r.ok) chip('error', '저장 실패 (' + r.status + ')');
         }).catch(function () {
-          setSyncStatus('저장 실패 — 네트워크를 확인해 주세요.', 'error');
+          chip('error', '저장 실패');
         });
       }, 350);
     }
 
     return {
-      init: function () {
-        loadCfg();
-        $('#syncUrl').value = cfg.url;
-        $('#syncRoom').value = cfg.room;
-        if (cfg.locked) {
-          var b = $('#btnSync');
-          if (b) b.hidden = true;   // 링크의 방으로 고정되므로 설정 창을 열지 않는다
-        }
-        if (cfg.url) {
-          chip('connecting', '연결 중…');
-          start();
-        } else {
-          chip('local', '로컬 저장');
-        }
-        renderRoomChip();
-      },
-      apply: function (url, room) {
-        if (cfg.locked) return;
-        cfg.off = false;
-        cfg.url = normalizeUrl(url);
-        cfg.room = sanitizeRoom(room) || DEMO_ROOM;
-        saveCfg();
-        $('#syncUrl').value = cfg.url;
-        $('#syncRoom').value = cfg.room;
-        renderRoomChip();
-        if (!cfg.url) { stop(); chip('local', '로컬 저장'); setSyncStatus('로컬 저장으로 돌아왔어요.', 'ok'); return; }
-        start();
-      },
-      disconnect: function () {
-        if (cfg.locked) return;
-        cfg.url = '';
-        cfg.off = true;
-        saveCfg();
+      // 방 ID + 초대 키로 입장을 시도한다. 성공하면 onResult(null), 실패하면 HTTP 코드를 넘긴다.
+      enter: function (room, key, onResult) {
         stop();
-        chip('local', '로컬 저장');
-        $('#syncUrl').value = '';
-        renderRoomChip();
-        setSyncStatus('연결을 해제했어요. 이 브라우저에만 저장됩니다.', 'ok');
+        cfg.room = room;
+        cfg.key = key;
+        chip('connecting', '입장 확인 중…');
+        adoptInitial().then(function () {
+          onResult(null);
+          connectStream();
+        }).catch(function (err) {
+          stop();
+          chip('error', '입장 차단');
+          onResult(err && err.code ? err.code : 0);
+        });
       },
-      room: function () { return cfg.room || DEMO_ROOM; },
       push: push
     };
   })();
 
-  function setSyncStatus(text, kind) {
-    var n = $('#syncStatus');
+  /* ------------------------------ 잠금 화면 / 입장 ------------------------------ */
+
+  var appRoot = $('#appRoot');
+  var lockScreen = $('#lockScreen');
+  var ENTERED = false;
+
+  function setLockStatus(text, kind) {
+    var n = $('#lockStatus');
+    if (!n) return;
     n.textContent = text || '';
     if (kind) n.dataset.kind = kind;
     else n.removeAttribute('data-kind');
   }
 
+  function showLock(msg, kind) {
+    ENTERED = false;
+    document.body.classList.add('is-locked');
+    if (appRoot) appRoot.hidden = true;
+    if (lockScreen) lockScreen.hidden = false;
+    if (msg) setLockStatus(msg, kind || 'error');
+    var r = $('#lockRoom');
+    if (r && !r.value && INVITE.room) r.value = INVITE.room;
+  }
+
+  function showApp() {
+    ENTERED = true;
+    document.body.classList.remove('is-locked');
+    if (lockScreen) lockScreen.hidden = true;
+    if (appRoot) appRoot.hidden = false;
+    setLockStatus('', null);
+    renderRoomChip();
+    renderAll();
+  }
+
+  function statusMessage(code) {
+    if (code === 401 || code === 403) return '초대 키가 올바르지 않습니다. 대장님이 보낸 초대 링크를 다시 확인해 주세요.';
+    if (code) return '연결할 수 없습니다 (HTTP ' + code + '). 잠시 뒤 다시 시도해 주세요.';
+    return '연결할 수 없습니다. 네트워크와 초대 링크를 확인해 주세요.';
+  }
+
+  function enterRoom(room, key, fromUrl) {
+    room = sanitizeRoom(room);
+    key = sanitizeKey(key);
+    if (!room) {
+      setLockStatus('방 ID를 입력해 주세요. 초대 링크에서 「room=」 뒤의 값을 붙여 넣으면 됩니다.', 'error');
+      return;
+    }
+    if (key.length < MIN_KEY_LEN) {
+      setLockStatus('초대 키가 올바르지 않습니다. 초대 링크의 「key=」 뒤 값을 그대로 붙여 넣어 주세요.', 'error');
+      return;
+    }
+
+    var prev = { room: INVITE.room, key: INVITE.key };
+    INVITE.room = room;
+    INVITE.key = key;
+    state = loadState();
+    setLockStatus('입장 확인 중…', null);
+
+    Sync.enter(room, key, function (code) {
+      if (code) {
+        INVITE.room = prev.room;
+        INVITE.key = prev.key;
+        if (fromUrl) history.replaceState({}, '', window.location.pathname);
+        showLock(statusMessage(code), 'error');
+        return;
+      }
+      if (!fromUrl) history.replaceState({}, '', inviteUrl(room, key));
+      var k = $('#lockKey');
+      if (k) k.value = '';
+      showApp();
+      if (state.pickles[0]) speak(state.pickles[0].id, '어서 오세요! 회의실입니다', 3600);
+    });
+  }
+
+  if ($('#formLock')) {
+    $('#formLock').addEventListener('submit', function (e) {
+      e.preventDefault();
+      enterRoom($('#lockRoom').value, $('#lockKey').value, false);
+    });
+  }
+
   /* ------------------------------ 현재 회의실 표시 ------------------------------ */
 
-  // 공유 링크 — 비공개 회의실은 ?room=<방ID> 링크, 공용 데모는 기본 주소.
+  // 복사 버튼은 방 ID와 초대 키가 함께 들어간 전체 초대 링크를 복사합니다.
   function shareUrl() {
-    var room = Sync.room() || DEMO_ROOM;
-    var base = window.location.origin + window.location.pathname;
-    if (room === DEMO_ROOM) return base;
-    return base + '?room=' + encodeURIComponent(room);
+    if (!INVITE.room || !INVITE.key) return window.location.origin + window.location.pathname;
+    return inviteUrl(INVITE.room, INVITE.key);
   }
 
   function renderRoomChip() {
     var box = $('#roomChip');
     if (!box) return;
-    var room = Sync.room() || DEMO_ROOM;
-    var isPrivate = room !== DEMO_ROOM;
-    box.dataset.kind = isPrivate ? 'private' : 'demo';
-    $('#roomChipLabel').textContent = isPrivate ? '비공개 회의실' : '공용 데모';
-    $('#roomChipName').textContent = room;
-    box.title = (isPrivate ? '링크를 받은 사람만 함께 쓰는 회의실' : '누구나 들어올 수 있는 공용 데모 회의실') + ' · ' + room;
+    box.dataset.kind = 'private';
+    $('#roomChipLabel').textContent = '초대 전용';
+    $('#roomChipName').textContent = INVITE.room || '—';
+    box.title = '대장님의 초대 링크로만 들어올 수 있는 회의실 · ' + (INVITE.room || '');
   }
 
   function legacyCopy(text) {
@@ -1043,30 +1025,6 @@
     }
   });
 
-  /* ------------------------------ 동기화 UI ------------------------------ */
-
-  var dlg = $('#dlgSync');
-
-  $('#btnSync').addEventListener('click', function () {
-    setSyncStatus('');
-    if (typeof dlg.showModal === 'function') dlg.showModal();
-    else dlg.setAttribute('open', '');
-  });
-
-  $('#formSync').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var url = $('#syncUrl').value.trim();
-    Sync.apply(url, $('#syncRoom').value);
-    if (!url) { dlg.close(); return; }
-    setSyncStatus('연결하는 중…', null);
-  });
-
-  $('#btnSyncOff').addEventListener('click', function () { Sync.disconnect(); });
-
-  dlg.addEventListener('click', function (e) {
-    if (e.target === dlg) dlg.close();
-  });
-
   /* ------------------------------ 렌더 ------------------------------ */
 
   function renderAll() {
@@ -1078,17 +1036,20 @@
   }
 
   renderAll();
-  Sync.init();
   startChatter();
 
-  // 첫 방문 안내 말풍선
-  setTimeout(function () {
-    if (state.pickles[0]) speak(state.pickles[0].id, '어서 오세요! 회의실입니다', 3600);
-  }, 700);
+  // 초대 링크로 들어왔으면 바로 입장을 확인하고, 아니면 잠금 화면만 보여 줍니다.
+  if (hasInvite()) {
+    enterRoom(INVITE.room, INVITE.key, true);
+  } else {
+    showLock(readParam('room') || readParam('key')
+      ? '초대 링크가 올바르지 않습니다. 방 ID와 초대 키를 다시 확인해 주세요.'
+      : '', null);
+  }
 
   // 다른 탭의 변경 반영
   window.addEventListener('storage', function (e) {
-    if (e.key !== KEY || !e.newValue) return;
+    if (!ENTERED || !INVITE.room || e.key !== stateKey() || !e.newValue) return;
     var s = normalize(JSON.parse(e.newValue));
     if (s) { state = s; renderAll(); }
   });
