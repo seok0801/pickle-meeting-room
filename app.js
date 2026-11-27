@@ -1,5 +1,5 @@
 /* 피클 합동 회의실 — app.js
-   단일 페이지 앱: 오피스 맵(SVG + 캐릭터), 말풍선 채팅방, 출석 보드, 안건/할 일.
+   단일 페이지 앱: 출석 보드, 안건/할 일, 말풍선 채팅방(실시간).
    저장: localStorage → (선택) Firebase Realtime Database 실시간 동기화. */
 (function () {
   'use strict';
@@ -41,7 +41,7 @@
       '?room=' + encodeURIComponent(room) + '&key=' + encodeURIComponent(key);
   }
 
-  /* ------------------------------ 팔레트 / 좌석 ------------------------------ */
+  /* ------------------------------ 팔레트 ------------------------------ */
 
   // 0번은 주봇 전용(노란 몸통 + 파란 귀/테두리)
   var PALETTE = [
@@ -54,36 +54,8 @@
     { body: '#D6E96B', ear: '#7A8F1F', ring: '#F2F8CC' }
   ];
 
-  // 오피스 맵(900x520) 위 좌석 좌표(%)
-  var SEATS = [
-    { x: 19.2, y: 24.0, zone: '회의실' },
-    { x: 40.8, y: 24.0, zone: '회의실' },
-    { x: 13.9, y: 38.3, zone: '회의실' },
-    { x: 45.9, y: 38.3, zone: '회의실' },
-    { x: 19.2, y: 49.8, zone: '회의실' },
-    { x: 40.8, y: 49.8, zone: '회의실' },
-    { x: 68.9, y: 58.5, zone: '작업실' },
-    { x: 84.4, y: 58.5, zone: '작업실' },
-    { x: 13.5, y: 81.5, zone: '라운지' },
-    { x: 25.0, y: 81.5, zone: '라운지' },
-    { x: 49.4, y: 82.7, zone: '라운지' },
-    { x: 71.0, y: 81.5, zone: '라운지' }
-  ];
-
   var STATUS_LABEL = { online: '온라인', working: '작업중', away: '대기' };
   var STATUS_ORDER = ['online', 'working', 'away'];
-
-  // 처음 배치할 때 구역을 골고루 나눠 앉힌다.
-  var PREF_ZONES = ['회의실', '회의실', '작업실', '작업실', '라운지', '회의실', '작업실', '라운지'];
-
-  var LINES = {
-    주봇: ['회의 시작할까요?', '안건 순서대로 볼게요', '모두 모였네요!', '오늘도 화이팅이에요', '기록은 민트가 맡아요'],
-    general: [
-      '확인했어요', '좋아요!', '할 일 하나 끝냈어요', '커피 한 잔 충전 중 ☕',
-      '주말 나들이 기대돼요', '장보기 리스트 정리했어요', '다음 안건 넘어갈까요?',
-      '회의실 정리해 뒀어요', '라운지에 간식 있어요', '안건 하나 더 있어요'
-    ]
-  };
 
   /* ------------------------------ 상태 ------------------------------ */
 
@@ -219,163 +191,6 @@
       '</svg>';
   }
 
-  /* ------------------------------ 오피스 맵 ------------------------------ */
-
-  var officeChars = $('#officeChars');
-  var charEls = new Map();   // id -> element
-  var charSeats = new Map(); // id -> seat index
-  var speakTimers = new Map();
-
-  function seatFree(idx, exceptId) {
-    var taken = false;
-    charSeats.forEach(function (seatIdx, id) {
-      if (seatIdx === idx && id !== exceptId) taken = true;
-    });
-    return !taken;
-  }
-
-  function pickSeat(preferredZone, exceptId) {
-    var pool = [];
-    for (var i = 0; i < SEATS.length; i++) {
-      if (!seatFree(i, exceptId)) continue;
-      pool.push(i);
-    }
-    if (!pool.length) return -1;
-    if (preferredZone) {
-      var inZone = pool.filter(function (i) { return SEATS[i].zone === preferredZone; });
-      if (inZone.length) return inZone[Math.floor(Math.random() * inZone.length)];
-    }
-    return pool[Math.floor(Math.random() * pool.length)];
-  }
-
-  function placeChar(node, seatIdx) {
-    var s = SEATS[seatIdx];
-    if (!s) return;
-    node.style.left = s.x + '%';
-    node.style.top = s.y + '%';
-    var bubble = $('.bubble', node);
-    if (bubble) {
-      bubble.removeAttribute('data-edge');
-      if (s.x < 26) bubble.setAttribute('data-edge', 'left');
-      else if (s.x > 74) bubble.setAttribute('data-edge', 'right');
-    }
-  }
-
-  function syncChars() {
-    var alive = new Set();
-    state.pickles.forEach(function (p, i) {
-      alive.add(p.id);
-      var node = charEls.get(p.id);
-      var color = colorOf(p);
-      if (!node) {
-        node = document.createElement('button');
-        node.type = 'button';
-        node.className = 'char';
-        node.dataset.id = p.id;
-        officeChars.appendChild(node);
-        charEls.set(p.id, node);
-        var prefZone = PREF_ZONES[i] || ['회의실', '작업실', '라운지'][i % 3];
-        var seat = pickSeat(prefZone, p.id);
-        if (seat < 0) seat = i % SEATS.length;
-        charSeats.set(p.id, seat);
-        node.style.transition = 'none';
-        placeChar(node, seat);
-        // 첫 페인트 후 이동 트랜지션 복원
-        requestAnimationFrame(function () { node.style.transition = ''; });
-      }
-      node.setAttribute('aria-label', p.name + ' — 인사하기');
-      node.title = p.name + ' · ' + (STATUS_LABEL[p.status] || '온라인');
-      var inner = $('.char-inner', node);
-      var svgKey = color.body + '|' + color.ear;
-      if (!inner) {
-        node.innerHTML = '<span class="char-inner">' + pickleSvg(color, true) +
-          '</span><span class="bubble" data-show="0" role="note"></span>';
-      } else if (inner.dataset.key !== svgKey) {
-        inner.innerHTML = pickleSvg(color, true);
-        inner.dataset.key = svgKey;
-      }
-      var innerNow = $('.char-inner', node);
-      if (innerNow && !innerNow.dataset.key) innerNow.dataset.key = svgKey;
-    });
-
-    charEls.forEach(function (node, id) {
-      if (!alive.has(id)) {
-        node.remove();
-        charEls.delete(id);
-        charSeats.delete(id);
-        var t = speakTimers.get(id);
-        if (t) { clearTimeout(t); speakTimers.delete(id); }
-      }
-    });
-  }
-
-  function speak(id, text, ms) {
-    var node = charEls.get(id);
-    if (!node) return;
-    var bubble = $('.bubble', node);
-    if (!bubble) return;
-    bubble.textContent = text;
-    bubble.setAttribute('data-show', '1');
-    var prev = speakTimers.get(id);
-    if (prev) clearTimeout(prev);
-    var t = setTimeout(function () {
-      bubble.setAttribute('data-show', '0');
-      speakTimers.delete(id);
-    }, ms || 3400);
-    speakTimers.set(id, t);
-  }
-
-  function randomLine(p) {
-    var pool = LINES[p.name] || LINES.general;
-    return pool[Math.floor(Math.random() * pool.length)];
-  }
-
-  function startChatter() {
-    setInterval(function () {
-      if (document.hidden) return;
-      if (!state.pickles.length) return;
-      var p = state.pickles[Math.floor(Math.random() * state.pickles.length)];
-      speak(p.id, randomLine(p), 3600);
-    }, 4600);
-
-    setInterval(function () {
-      if (document.hidden) return;
-      var ids = Array.from(charSeats.keys());
-      if (ids.length < 1) return;
-      var id = ids[Math.floor(Math.random() * ids.length)];
-      var current = charSeats.get(id);
-      var s = SEATS[current];
-      var zone = s ? s.zone : null;
-      // 45%는 같은 구역 안에서 자리만 옮기고, 나머지는 다른 구역으로 이동
-      var target = Math.random() < 0.45
-        ? SEATS.map(function (v, i) { return i; }).filter(function (i) { return SEATS[i].zone === zone && seatFree(i, id); })
-        : null;
-      var next;
-      if (target && target.length) {
-        next = target[Math.floor(Math.random() * target.length)];
-      } else {
-        var others = ['회의실', '작업실', '라운지'].filter(function (z) { return z !== zone; });
-        next = pickSeat(others[Math.floor(Math.random() * others.length)], id);
-      }
-      if (next == null || next < 0 || next === current) return;
-      var node = charEls.get(id);
-      if (!node) return;
-      charSeats.set(id, next);
-      node.dataset.walk = '1';
-      placeChar(node, next);
-      setTimeout(function () { if (node.dataset.walk === '1') delete node.dataset.walk; }, 2500);
-    }, 9000);
-  }
-
-  officeChars.addEventListener('click', function (e) {
-    var node = e.target.closest('.char');
-    if (!node) return;
-    var p = state.pickles.find(function (x) { return x.id === node.dataset.id; });
-    if (!p) return;
-    var greet = p.name === '주봇' ? '어서 오세요, 회의 준비됐어요!' : '안녕하세요, ' + p.name + '예요!';
-    speak(p.id, greet, 3200);
-  });
-
   /* ------------------------------ 출석 보드 ------------------------------ */
 
   var attendList = $('#attendList');
@@ -409,8 +224,6 @@
       sel.addEventListener('change', function () {
         p.status = sel.value;
         sel.dataset.status = p.status;
-        var node = charEls.get(p.id);
-        if (node) node.title = p.name + ' · ' + STATUS_LABEL[p.status];
         react(p.name, STATUS_LABEL[p.status] + ' 상태로 바꿨어요');
         save();
         renderAttendSummary();
@@ -599,7 +412,6 @@
     var who = p ? p.name : '피클';
     var tail = REACTIONS[Math.floor(Math.random() * REACTIONS.length)];
     addLine(who, (context ? context + ' — ' : '') + tail, 'pickle');
-    if (p) speak(p.id, tail, 2800);
     renderChat();
   }
 
@@ -610,6 +422,7 @@
 
   // 이름에 맞는 피클 얼굴 — 출석한 피클이면 자기 색, 아니면 기본 피클
   function chatAvatar(who) {
+    if (who === '주봇') return pickleSvg(PALETTE[0], false);
     var p = pickleNameById(who);
     if (p) return pickleSvg(colorOf(p), false);
     return '<svg viewBox="0 0 100 104" aria-hidden="true" focusable="false">' +
@@ -623,7 +436,8 @@
   }
 
   // timeline 데이터(who · text · ts · kind)를 피클 앱/카톡 스타일 말풍선으로 그립니다.
-  // 내 말(who === '나')은 오른쪽 노란 말풍선, 피클 말(주봇·모모 등)은 왼쪽 말풍선.
+  // 우리 측(나 · 주봇)은 오른쪽, 외부 피클(모모 등)은 왼쪽으로 좌우를 교차시킵니다.
+  // 오른쪽에서도 나(노란 말풍선·'나' 배지)와 주봇(파란 말풍선·이름 배지)은 색과 배지로 구분됩니다.
   function renderChat() {
     var items = state.timeline.slice().sort(function (a, b) { return a.ts - b.ts; });
     var wasHidden = chatFeed.hidden;
@@ -638,12 +452,13 @@
         lastDay = day;
       }
 
-      var mine = m.who === '나';
-      var row = el('div', 'msg' + (mine ? ' is-me' : ''));
+      var isMe = m.who === '나';
+      var mine = isMe || m.who === '주봇';   // 우리 측
+      var row = el('div', 'msg' + (mine ? ' is-me' : '') + (isMe ? ' is-self' : '') + (m.who === '주봇' ? ' is-jubot' : ''));
       row.dataset.id = m.id;
 
       var body = el('div', 'msg-body');
-      if (!mine) body.appendChild(el('span', 'msg-name', m.who));
+      if (!isMe) body.appendChild(el('span', 'msg-name', m.who));
 
       var line = el('div', 'msg-line');
       var bubble = el('div', 'msg-bubble', m.text);
@@ -658,8 +473,8 @@
       }
       body.appendChild(line);
 
-      var av = el('span', 'msg-av' + (mine ? ' msg-av-me' : ''));
-      if (mine) av.textContent = '나';
+      var av = el('span', 'msg-av' + (isMe ? ' msg-av-me' : ''));
+      if (isMe) av.textContent = '나';
       else av.innerHTML = chatAvatar(m.who);
       av.setAttribute('aria-hidden', 'true');
 
@@ -715,8 +530,6 @@
     addLine('주봇', name + ' 피클이 출근했어요. 자리를 안내해 주세요.', 'pickle');
     save();
     renderChat();
-    var last = state.pickles[state.pickles.length - 1];
-    speak(last.id, '안녕하세요! 잘 부탁드려요', 3200);
   });
 
   /* ------------------------------ 내보내기 / 불러오기 ------------------------------ */
@@ -1013,7 +826,6 @@
       var k = $('#lockKey');
       if (k) k.value = '';
       showApp();
-      if (state.pickles[0]) speak(state.pickles[0].id, '어서 오세요! 회의실입니다', 3600);
     });
   }
 
@@ -1078,7 +890,6 @@
   /* ------------------------------ 렌더 ------------------------------ */
 
   function renderAll() {
-    syncChars();
     renderAttend();
     renderOwnerSelect();
     renderItems();
@@ -1086,7 +897,6 @@
   }
 
   renderAll();
-  startChatter();
 
   // 초대 링크로 들어왔으면 바로 입장을 확인하고, 아니면 잠금 화면만 보여 줍니다.
   if (hasInvite()) {

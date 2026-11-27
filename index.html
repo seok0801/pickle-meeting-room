@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>피클 합동 회의실 · Pickle Meeting Room</title>
-<meta name="description" content="귀여운 피클 캐릭터들이 함께 출근해 여는 합동 회의실. 오피스 맵, 말풍선 채팅방, 출석 보드, 안건·할 일.">
+<meta name="description" content="귀여운 피클들이 함께 모여 회의하는 합동 회의실. 출석 보드, 회의 안건·할 일, 실시간 말풍선 채팅방.">
 <meta name="theme-color" content="#FFD84D">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css?v=20261128c">
+<link rel="stylesheet" href="styles.css?v=20261128d">
 </head>
 <body>
 <!-- ============ 초대 전용 잠금 화면 ============ -->
@@ -73,147 +73,7 @@
 
   <main class="layout">
 
-    <div class="col col-main">
-
-    <!-- ============ 오피스 맵 ============ -->
-    <section class="panel panel-map" aria-labelledby="mapTitle">
-      <div class="panel-head">
-        <h2 id="mapTitle">피클 오피스</h2>
-        <p class="panel-sub" id="mapSub">회의실 · 작업실 · 라운지</p>
-      </div>
-
-      <div class="office" id="office" aria-label="피클 오피스 맵">
-        <svg class="office-svg" viewBox="0 0 900 520" role="img" aria-label="회의실, 작업실, 라운지로 나뉜 피클 오피스 도면">
-          <defs>
-            <pattern id="floorDots" width="26" height="26" patternUnits="userSpaceOnUse">
-              <circle cx="2" cy="2" r="1.6" fill="#EADFC4"/>
-            </pattern>
-            <linearGradient id="tableTop" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#F6E7C6"/>
-              <stop offset="1" stop-color="#E9D3A5"/>
-            </linearGradient>
-            <linearGradient id="rugGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#FFF1CF"/>
-              <stop offset="1" stop-color="#FFE1A8"/>
-            </linearGradient>
-            <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#B79B5E" flood-opacity="0.22"/>
-            </filter>
-          </defs>
-
-          <rect x="0" y="0" width="900" height="520" fill="#FFFDF6"/>
-          <rect x="0" y="0" width="900" height="520" fill="url(#floorDots)"/>
-
-          <!-- 회의실 -->
-          <g>
-            <rect x="34" y="34" width="472" height="282" rx="26" fill="#FFF9EA" stroke="#F2DFB0" stroke-width="3" stroke-dasharray="10 8"/>
-            <g transform="translate(52,48)">
-              <rect x="0" y="0" width="86" height="26" rx="13" fill="#FFD84D"/>
-              <text x="43" y="18" text-anchor="middle" font-size="14" font-weight="700" fill="#5B4400" font-family="inherit">회의실</text>
-            </g>
-            <ellipse cx="270" cy="300" rx="150" ry="8" fill="#E7D6AE" opacity="0.5"/>
-            <ellipse cx="270" cy="190" rx="122" ry="62" fill="url(#tableTop)" stroke="#DCC291" stroke-width="3" filter="url(#soft)"/>
-            <ellipse cx="270" cy="186" rx="104" ry="48" fill="none" stroke="#E8D6B0" stroke-width="2"/>
-            <!-- 의자 -->
-            <rect x="150" y="112" width="46" height="26" rx="12" fill="#CFE0FF" stroke="#9DBDFF" stroke-width="2"/>
-            <rect x="344" y="112" width="46" height="26" rx="12" fill="#CFE0FF" stroke="#9DBDFF" stroke-width="2"/>
-            <rect x="112" y="176" width="26" height="46" rx="12" fill="#CFE0FF" stroke="#9DBDFF" stroke-width="2"/>
-            <rect x="400" y="176" width="26" height="46" rx="12" fill="#CFE0FF" stroke="#9DBDFF" stroke-width="2"/>
-            <rect x="150" y="246" width="46" height="26" rx="12" fill="#CFE0FF" stroke="#9DBDFF" stroke-width="2"/>
-            <rect x="344" y="246" width="46" height="26" rx="12" fill="#CFE0FF" stroke="#9DBDFF" stroke-width="2"/>
-            <!-- 테이블 위 소품 -->
-            <rect x="240" y="168" width="60" height="40" rx="8" fill="#FFFFFF" stroke="#E4D2AA" stroke-width="2"/>
-            <line x1="250" y1="180" x2="290" y2="180" stroke="#D9C48F" stroke-width="3" stroke-linecap="round"/>
-            <line x1="250" y1="190" x2="282" y2="190" stroke="#E6D6B0" stroke-width="3" stroke-linecap="round"/>
-            <circle cx="222" cy="196" r="7" fill="#FFB3C7"/>
-            <circle cx="318" cy="196" r="7" fill="#A9E7C6"/>
-          </g>
-
-          <!-- 작업실 -->
-          <g>
-            <rect x="524" y="34" width="342" height="282" rx="26" fill="#F5FAFF" stroke="#CFE0FF" stroke-width="3" stroke-dasharray="10 8"/>
-            <g transform="translate(542,48)">
-              <rect x="0" y="0" width="86" height="26" rx="13" fill="#C9DCFF"/>
-              <text x="43" y="18" text-anchor="middle" font-size="14" font-weight="700" fill="#183A78" font-family="inherit">작업실</text>
-            </g>
-            <!-- 책상 1 -->
-            <rect x="566" y="196" width="132" height="58" rx="10" fill="#E8DCC4" stroke="#CDB88F" stroke-width="2"/>
-            <rect x="596" y="160" width="72" height="44" rx="6" fill="#2F3A55"/>
-            <rect x="602" y="166" width="60" height="32" rx="3" fill="#8FD3FF"/>
-            <!-- 책상 2 -->
-            <rect x="716" y="196" width="132" height="58" rx="10" fill="#E8DCC4" stroke="#CDB88F" stroke-width="2"/>
-            <rect x="746" y="160" width="72" height="44" rx="6" fill="#2F3A55"/>
-            <rect x="752" y="166" width="60" height="32" rx="3" fill="#B9F0D2"/>
-            <!-- 화이트보드 -->
-            <rect x="672" y="96" width="150" height="44" rx="8" fill="#FFFFFF" stroke="#C9DCFF" stroke-width="3"/>
-            <line x1="688" y1="112" x2="770" y2="112" stroke="#9DBDFF" stroke-width="4" stroke-linecap="round"/>
-            <line x1="688" y1="124" x2="790" y2="124" stroke="#CFE0FF" stroke-width="4" stroke-linecap="round"/>
-            <!-- 화분 -->
-            <path d="M812 300 l-10 26 h34 l-10 -26 z" fill="#E08A5B"/>
-            <circle cx="817" cy="292" r="15" fill="#8FD9A8"/>
-            <circle cx="828" cy="286" r="11" fill="#A9E7C6"/>
-          </g>
-
-          <!-- 라운지 -->
-          <g>
-            <rect x="34" y="344" width="832" height="146" rx="26" fill="#FFF6F9" stroke="#F7CFDC" stroke-width="3" stroke-dasharray="10 8"/>
-            <g transform="translate(52,358)">
-              <rect x="0" y="0" width="86" height="26" rx="13" fill="#FFC9DB"/>
-              <text x="43" y="18" text-anchor="middle" font-size="14" font-weight="700" fill="#7A2440" font-family="inherit">라운지</text>
-            </g>
-            <ellipse cx="470" cy="428" rx="196" ry="48" fill="url(#rugGrad)" opacity="0.9"/>
-            <!-- 소파 -->
-            <rect x="80" y="404" width="216" height="66" rx="22" fill="#FFD9E4" stroke="#F2B3C7" stroke-width="3"/>
-            <rect x="92" y="386" width="192" height="34" rx="16" fill="#FFC9DB"/>
-            <rect x="118" y="404" width="66" height="26" rx="10" fill="#FFF3F7"/>
-            <rect x="190" y="404" width="66" height="26" rx="10" fill="#FFF3F7"/>
-            <!-- 테이블 -->
-            <ellipse cx="405" cy="428" rx="52" ry="22" fill="#EAD9BE" stroke="#D6C094" stroke-width="2"/>
-            <rect x="392" y="404" width="26" height="20" rx="4" fill="#FFFFFF" stroke="#E4D2AA" stroke-width="2"/>
-            <!-- 커피 -->
-            <rect x="612" y="404" width="22" height="26" rx="4" fill="#FFFFFF" stroke="#E4D2AA" stroke-width="2"/>
-            <rect x="646" y="410" width="22" height="20" rx="4" fill="#FFFFFF" stroke="#E4D2AA" stroke-width="2"/>
-            <!-- 화분 2 -->
-            <path d="M790 414 l-12 34 h40 l-12 -34 z" fill="#7FB6E8"/>
-            <circle cx="800" cy="404" r="17" fill="#8FD9A8"/>
-            <circle cx="812" cy="396" r="12" fill="#A9E7C6"/>
-            <!-- 스탠드 -->
-            <line x1="546" y1="452" x2="546" y2="398" stroke="#C8AE7E" stroke-width="4" stroke-linecap="round"/>
-            <circle cx="546" cy="392" r="14" fill="#FFE38A" stroke="#E3C463" stroke-width="3"/>
-          </g>
-        </svg>
-
-        <div class="chat-layer" id="officeChars" aria-live="polite"></div>
-      </div>
-
-      <div class="map-legend">
-        <span class="legend-item"><i class="legend-dot" style="background:#FFD84D"></i>주봇 · 회의 진행</span>
-        <span class="legend-item"><i class="legend-dot" style="background:#7BE0C0"></i>게스트 피클</span>
-        <span class="legend-item"><i class="legend-dot" style="background:#B39DFF"></i>작업 담당</span>
-        <span class="legend-item muted">말풍선을 누르면 인사해요</span>
-      </div>
-    </section>
-
-    <!-- ============ 채팅방 (말풍선 대화) ============ -->
-    <section class="panel panel-chat" aria-labelledby="chatTitle">
-      <div class="panel-head">
-        <h2 id="chatTitle">회의 채팅방</h2>
-        <p class="panel-sub"><span id="chatCount">0</span>개 메시지 · 실시간</p>
-      </div>
-
-      <div class="chat-feed" id="chatFeed" role="log" aria-live="polite" aria-relevant="additions" aria-label="회의 채팅 메시지"></div>
-      <p class="empty chat-empty" id="chatEmpty">아직 메시지가 없어요. 첫 메시지를 보내 보세요.</p>
-
-      <form class="chat-form" id="formChat" autocomplete="off">
-        <label class="sr-only" for="chatText">메시지</label>
-        <input id="chatText" type="text" maxlength="120" placeholder="메시지를 입력하고 Enter" required>
-        <button type="submit" class="btn btn-primary chat-send">전송</button>
-      </form>
-    </section>
-
-    </div>
-
-    <div class="col col-side">
+    <div class="col col-left">
 
     <!-- ============ 출석 ============ -->
     <section class="panel panel-attend" aria-labelledby="attendTitle">
@@ -268,6 +128,27 @@
 
     </div>
 
+    <div class="col col-chat">
+
+    <!-- ============ 채팅방 (말풍선 대화) ============ -->
+    <section class="panel panel-chat" aria-labelledby="chatTitle">
+      <div class="panel-head">
+        <h2 id="chatTitle">회의 채팅방</h2>
+        <p class="panel-sub"><span id="chatCount">0</span>개 메시지 · 실시간</p>
+      </div>
+
+      <div class="chat-feed" id="chatFeed" role="log" aria-live="polite" aria-relevant="additions" aria-label="회의 채팅 메시지"></div>
+      <p class="empty chat-empty" id="chatEmpty">아직 메시지가 없어요. 첫 메시지를 보내 보세요.</p>
+
+      <form class="chat-form" id="formChat" autocomplete="off">
+        <label class="sr-only" for="chatText">메시지</label>
+        <input id="chatText" type="text" maxlength="120" placeholder="메시지를 입력하고 Enter" required>
+        <button type="submit" class="btn btn-primary chat-send">전송</button>
+      </form>
+    </section>
+
+    </div>
+
   </main>
 
   <footer class="foot">
@@ -276,6 +157,6 @@
   </footer>
 </div>
 
-<script src="app.js?v=20261128c"></script>
+<script src="app.js?v=20261128d"></script>
 </body>
 </html>
