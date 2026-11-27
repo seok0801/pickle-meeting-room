@@ -626,6 +626,7 @@
   // 내 말(who === '나')은 오른쪽 노란 말풍선, 피클 말(주봇·모모 등)은 왼쪽 말풍선.
   function renderChat() {
     var items = state.timeline.slice().sort(function (a, b) { return a.ts - b.ts; });
+    var wasHidden = chatFeed.hidden;
     var nearBottom = chatFeed.scrollHeight - chatFeed.scrollTop - chatFeed.clientHeight < 80;
     chatFeed.textContent = '';
 
@@ -673,8 +674,8 @@
     chatCount.textContent = items.length;
 
     if (chatFeed.hidden) { lastChatId = last; return; }
-    // 새 메시지가 붙었거나 보고 있던 위치가 맨 아래 근처면 자동으로 맨 아래로
-    if (last !== lastChatId || nearBottom) chatFeed.scrollTop = chatFeed.scrollHeight;
+    // 새 메시지가 붙었거나, 처음 화면에 나타났거나, 보고 있던 위치가 맨 아래 근처면 맨 아래로
+    if (wasHidden || last !== lastChatId || nearBottom) chatFeed.scrollTop = chatFeed.scrollHeight;
     lastChatId = last;
   }
 
@@ -971,6 +972,7 @@
     if (lockScreen) lockScreen.hidden = true;
     if (appRoot) appRoot.hidden = false;
     setLockStatus('', null);
+    lastChatId = null;   // 화면에 처음 나타날 때는 채팅 맨 아래부터 보여 줍니다
     renderRoomChip();
     renderAll();
   }
