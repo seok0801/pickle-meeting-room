@@ -227,10 +227,15 @@ body {
 
 /* ---------- layout ---------- */
 .layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: clamp(14px, 1.6vw, 20px);
 }
+
+/* 왼쪽(오피스·채팅방) · 오른쪽(출석·안건) 컬럼 — 좁은 화면에서는 내용만 펼쳐
+   오피스 → 채팅방 → 출석 → 안건 순으로 자연스럽게 이어집니다. */
+.col { display: contents; }
+.col-main, .col-side { min-width: 0; }
 
 .panel {
   background: var(--card);
@@ -614,62 +619,165 @@ input:focus, select:focus {
   border-radius: var(--r-sm);
 }
 
-/* ---------- timeline ---------- */
-.timeline {
-  list-style: none;
-  margin: 0;
-  padding: 0 0 0 4px;
+/* ---------- chat room (말풍선 대화) ---------- */
+.panel-chat { gap: 10px; }
+
+.chat-feed {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: 340px;
+  gap: 12px;
+  min-height: 240px;
+  max-height: clamp(260px, 44vh, 440px);
   overflow-y: auto;
   overscroll-behavior: contain;
+  padding: 12px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background:
+    radial-gradient(620px 220px at 50% 0%, #FFF6DA 0%, rgba(255, 246, 218, 0) 72%),
+    #FFFCF3;
 }
-.tl-item {
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  gap: 9px;
-  position: relative;
-  padding-left: 2px;
+.chat-feed[hidden] { display: none; }
+.chat-empty { padding: 18px; }
+
+.chat-day {
+  align-self: center;
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: #FFF6DA;
+  border: 1px solid var(--line-2);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink-3);
 }
-.tl-item::before {
-  content: "";
-  position: absolute;
-  left: 14px; top: 26px; bottom: -10px;
-  width: 2px;
-  background: var(--line);
+
+.msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
 }
-.tl-item:last-child::before { display: none; }
-.tl-av {
-  width: 26px; height: 26px;
-  border-radius: 9px;
+.msg-av {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 10px;
   background: #fff;
   border: 1.5px solid var(--line-2);
-  display: grid; place-items: center;
-  z-index: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
-.tl-av svg { width: 19px; height: 20px; }
-.tl-main { min-width: 0; }
-.tl-head {
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
-  flex-wrap: wrap;
+.msg-av svg { width: 22px; height: 23px; display: block; }
+.msg-av-me {
+  border-radius: 50%;
+  background: var(--yellow);
+  border-color: var(--yellow-deep);
   font-size: 12px;
+  font-weight: 800;
+  color: #4A3600;
 }
-.tl-who { font-weight: 800; }
-.tl-time { color: var(--ink-3); font-weight: 600; font-size: 11px; }
-.tl-text {
-  margin: 2px 0 0;
-  font-size: 13px;
+
+.msg-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  max-width: min(78%, 520px);
+}
+.msg-name {
+  font-size: 11.5px;
+  font-weight: 800;
   color: var(--ink-2);
+  padding: 0 2px;
+}
+.msg-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.msg-bubble {
+  position: relative;
+  padding: 8px 12px;
+  border-radius: 15px;
+  background: #fff;
+  border: 1.5px solid var(--line-2);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.5;
   word-break: break-word;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+  box-shadow: var(--shadow-sm);
 }
-.tl-item.is-note .tl-text { color: var(--ink); font-weight: 600; }
-.tl-item.is-note .tl-av { background: var(--blue-soft); border-color: #C6D6FF; }
+/* 꼬리 — 상대(왼쪽) */
+.msg:not(.is-me) .msg-bubble { border-bottom-left-radius: 5px; }
+.msg:not(.is-me) .msg-bubble::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  bottom: 5px;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-left: 1.5px solid var(--line-2);
+  border-bottom: 1.5px solid var(--line-2);
+  transform: rotate(45deg);
+}
+.msg-time {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  line-height: 1.3;
+  padding-bottom: 3px;
+  white-space: nowrap;
+}
+
+/* 내 말 — 오른쪽, 노란 말풍선 */
+.msg.is-me { flex-direction: row-reverse; }
+.msg.is-me .msg-body { align-items: flex-end; }
+.msg.is-me .msg-bubble {
+  background: var(--yellow);
+  border-color: var(--yellow-deep);
+  border-bottom-right-radius: 5px;
+  color: #3D2C00;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(224, 168, 0, .18);
+}
+.msg.is-me .msg-bubble::after {
+  content: "";
+  position: absolute;
+  right: -6px;
+  bottom: 5px;
+  width: 10px;
+  height: 10px;
+  background: var(--yellow);
+  border-right: 1.5px solid var(--yellow-deep);
+  border-bottom: 1.5px solid var(--yellow-deep);
+  transform: rotate(45deg);
+}
+
+.chat-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px dashed var(--line-2);
+  padding-top: 10px;
+}
+.chat-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+}
+.chat-send { flex: 0 0 auto; padding: 10px 16px; }
 
 /* ---------- footer ---------- */
 .foot {
@@ -826,26 +934,27 @@ input:focus, select:focus {
 /* ---------- responsive ---------- */
 @media (min-width: 700px) {
   .layout {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .panel-map { grid-column: 1 / -1; }
-  .layout > section:nth-child(4) { grid-column: 1 / -1; } /* 타임라인 */
+  .panel-chat { grid-column: 1 / -1; }
 }
 
 @media (min-width: 1040px) {
   .layout {
+    display: grid;
     grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
     align-items: start;
   }
-  .panel-map {
-    grid-column: 1;
-    grid-row: 1 / span 3;
-    position: sticky;
-    top: 16px;
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(14px, 1.6vw, 20px);
+    min-width: 0;
   }
-  .layout > section:nth-child(2) { grid-column: 2; grid-row: 1; }
-  .layout > section:nth-child(3) { grid-column: 2; grid-row: 2; }
-  .layout > section:nth-child(4) { grid-column: 2; grid-row: 3; }
+  .col-main { grid-column: 1; }
+  .col-side { grid-column: 2; }
 }
 
 @media (max-width: 699px) {
@@ -859,7 +968,8 @@ input:focus, select:focus {
   .sync-chip { flex: 1 1 100%; justify-content: center; order: -1; }
   .map-legend { font-size: 11px; gap: 10px; }
   .legend-item.muted { display: none; }
-  .item-list, .timeline { max-height: none; }
+  .item-list { max-height: none; }
+  .chat-feed { min-height: 200px; max-height: 54vh; }
   .office { aspect-ratio: 900 / 560; }
   .item-form-row select { max-width: 45%; }
 }

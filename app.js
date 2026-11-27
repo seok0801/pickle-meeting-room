@@ -1,5 +1,5 @@
 /* 피클 합동 회의실 — app.js
-   단일 페이지 앱: 오피스 맵(SVG + 캐릭터), 출석 보드, 안건/할 일, 타임라인.
+   단일 페이지 앱: 오피스 맵(SVG + 캐릭터), 말풍선 채팅방, 출석 보드, 안건/할 일.
    저장: localStorage → (선택) Firebase Realtime Database 실시간 동기화. */
 (function () {
   'use strict';
@@ -494,7 +494,7 @@
         react(null, (cb.checked ? '완료! ' : '다시 진행할게요. ') + '“' + short(it.title) + '”');
         save();
         renderItems();
-        renderTimeline();
+        renderChat();
       });
 
       var body = el('div', 'item-body');
@@ -565,12 +565,15 @@
     });
     react(null, '새 ' + (item.type === 'todo' ? '할 일' : '안건') + ' “' + short(item.title) + '” 추가했어요');
     renderItems();
-    renderTimeline();
+    renderChat();
   });
 
-  /* ------------------------------ 타임라인 ------------------------------ */
+  /* ------------------------------ 채팅방 (말풍선 대화) ------------------------------ */
 
-  var timelineEl = $('#timeline');
+  var chatFeed = $('#chatFeed');
+  var chatEmpty = $('#chatEmpty');
+  var chatCount = $('#chatCount');
+  var lastChatId = null;
 
   function addLine(who, text, kind) {
     state.timeline.push({
@@ -583,7 +586,7 @@
     if (state.timeline.length > MAX_TL) state.timeline = state.timeline.slice(-MAX_TL);
   }
 
-  // 이벤트에 대한 피클의 짧은 반응 (타임라인 + 말풍선)
+  // 이벤트에 대한 피클의 짧은 반응 (채팅 + 말풍선)
   var REACTIONS = [
     '좋아요, 바로 반영할게요.', '확인했습니다!', '기록해 뒀어요.', '이건 제가 챙길게요.',
     '다음 안건도 볼까요?', '회의실에 공유했습니다.', '좋은 흐름이에요!'
@@ -597,49 +600,94 @@
     var tail = REACTIONS[Math.floor(Math.random() * REACTIONS.length)];
     addLine(who, (context ? context + ' — ' : '') + tail, 'pickle');
     if (p) speak(p.id, tail, 2800);
-    renderTimeline();
+    renderChat();
   }
 
-  function renderTimeline() {
-    timelineEl.textContent = '';
+  function fmtDate(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
+  }
+
+  // 이름에 맞는 피클 얼굴 — 출석한 피클이면 자기 색, 아니면 기본 피클
+  function chatAvatar(who) {
+    var p = pickleNameById(who);
+    if (p) return pickleSvg(colorOf(p), false);
+    return '<svg viewBox="0 0 100 104" aria-hidden="true" focusable="false">' +
+      '<ellipse cx="22" cy="27" rx="13" ry="13" fill="#7BE0C0"/>' +
+      '<ellipse cx="78" cy="27" rx="13" ry="13" fill="#7BE0C0"/>' +
+      '<rect x="14" y="28" width="72" height="66" rx="31" fill="#D9FBEF" stroke="#1F8F68" stroke-width="4.5"/>' +
+      '<ellipse cx="38" cy="63" rx="5.5" ry="7" fill="#2A2418"/>' +
+      '<ellipse cx="62" cy="63" rx="5.5" ry="7" fill="#2A2418"/>' +
+      '<path d="M44 78 q6 6.5 12 0" stroke="#2A2418" stroke-width="3" fill="none" stroke-linecap="round"/>' +
+      '</svg>';
+  }
+
+  // timeline 데이터(who · text · ts · kind)를 피클 앱/카톡 스타일 말풍선으로 그립니다.
+  // 내 말(who === '나')은 오른쪽 노란 말풍선, 피클 말(주봇·모모 등)은 왼쪽 말풍선.
+  function renderChat() {
     var items = state.timeline.slice().sort(function (a, b) { return a.ts - b.ts; });
+    var nearBottom = chatFeed.scrollHeight - chatFeed.scrollTop - chatFeed.clientHeight < 80;
+    chatFeed.textContent = '';
+
+    var lastDay = '';
     items.forEach(function (m) {
-      var li = el('li', 'tl-item ' + (m.kind === 'note' ? 'is-note' : ''));
-      var av = el('span', 'tl-av');
-      var p = pickleNameById(m.who);
-      if (p) {
-        av.innerHTML = pickleSvg(colorOf(p), false);
-      } else {
-        av.innerHTML = '<svg viewBox="0 0 100 104" aria-hidden="true">' +
-          '<rect x="18" y="30" width="64" height="60" rx="26" fill="#EAF0FF" stroke="#2F6BFF" stroke-width="4"/>' +
-          '<ellipse cx="38" cy="60" rx="5" ry="6.5" fill="#2A2418"/>' +
-          '<ellipse cx="62" cy="60" rx="5" ry="6.5" fill="#2A2418"/>' +
-          '<path d="M43 76 q7 6 14 0" stroke="#2A2418" stroke-width="3" fill="none" stroke-linecap="round"/>' +
-          '</svg>';
+      var day = fmtDate(m.ts);
+      if (day !== lastDay) {
+        chatFeed.appendChild(el('div', 'chat-day', day));
+        lastDay = day;
       }
-      var main = el('div', 'tl-main');
-      var head = el('div', 'tl-head');
-      head.appendChild(el('span', 'tl-who', m.who));
-      head.appendChild(el('span', 'tl-time', fmtTime(m.ts)));
-      var txt = el('p', 'tl-text', m.text);
-      main.appendChild(head);
-      main.appendChild(txt);
-      li.appendChild(av);
-      li.appendChild(main);
-      timelineEl.appendChild(li);
+
+      var mine = m.who === '나';
+      var row = el('div', 'msg' + (mine ? ' is-me' : ''));
+      row.dataset.id = m.id;
+
+      var body = el('div', 'msg-body');
+      if (!mine) body.appendChild(el('span', 'msg-name', m.who));
+
+      var line = el('div', 'msg-line');
+      var bubble = el('div', 'msg-bubble', m.text);
+      bubble.title = day + ' ' + fmtTime(m.ts);
+      var time = el('span', 'msg-time', fmtTime(m.ts));
+      if (mine) {
+        line.appendChild(time);
+        line.appendChild(bubble);
+      } else {
+        line.appendChild(bubble);
+        line.appendChild(time);
+      }
+      body.appendChild(line);
+
+      var av = el('span', 'msg-av' + (mine ? ' msg-av-me' : ''));
+      if (mine) av.textContent = '나';
+      else av.innerHTML = chatAvatar(m.who);
+      av.setAttribute('aria-hidden', 'true');
+
+      row.appendChild(av);
+      row.appendChild(body);
+      chatFeed.appendChild(row);
     });
-    timelineEl.scrollTop = timelineEl.scrollHeight;
+
+    var last = items.length ? items[items.length - 1].id : null;
+    chatEmpty.hidden = items.length > 0;
+    chatFeed.hidden = items.length === 0;
+    chatCount.textContent = items.length;
+
+    if (chatFeed.hidden) { lastChatId = last; return; }
+    // 새 메시지가 붙었거나 보고 있던 위치가 맨 아래 근처면 자동으로 맨 아래로
+    if (last !== lastChatId || nearBottom) chatFeed.scrollTop = chatFeed.scrollHeight;
+    lastChatId = last;
   }
 
-  $('#formNote').addEventListener('submit', function (e) {
+  $('#formChat').addEventListener('submit', function (e) {
     e.preventDefault();
-    var input = $('#noteText');
+    var input = $('#chatText');
     var text = input.value.trim();
-    if (!text) return;
+    if (!text) { input.focus(); return; }
     addLine('나', text, 'note');
     input.value = '';
     save();
-    renderTimeline();
+    renderChat();
+    input.focus();
   });
 
   $('#formPickle').addEventListener('submit', function (e) {
@@ -665,7 +713,7 @@
     renderAll();
     addLine('주봇', name + ' 피클이 출근했어요. 자리를 안내해 주세요.', 'pickle');
     save();
-    renderTimeline();
+    renderChat();
     var last = state.pickles[state.pickles.length - 1];
     speak(last.id, '안녕하세요! 잘 부탁드려요', 3200);
   });
@@ -1032,7 +1080,7 @@
     renderAttend();
     renderOwnerSelect();
     renderItems();
-    renderTimeline();
+    renderChat();
   }
 
   renderAll();

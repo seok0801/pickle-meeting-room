@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>피클 합동 회의실 · Pickle Meeting Room</title>
-<meta name="description" content="귀여운 피클 캐릭터들이 함께 출근해 여는 합동 회의실. 오피스 맵, 출석 보드, 안건·할 일, 회의 타임라인.">
+<meta name="description" content="귀여운 피클 캐릭터들이 함께 출근해 여는 합동 회의실. 오피스 맵, 말풍선 채팅방, 출석 보드, 안건·할 일.">
 <meta name="theme-color" content="#FFD84D">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css?v=20261128a">
+<link rel="stylesheet" href="styles.css?v=20261128b">
 </head>
 <body>
 <!-- ============ 초대 전용 잠금 화면 ============ -->
@@ -72,6 +72,8 @@
   </header>
 
   <main class="layout">
+
+    <div class="col col-main">
 
     <!-- ============ 오피스 맵 ============ -->
     <section class="panel panel-map" aria-labelledby="mapTitle">
@@ -192,8 +194,29 @@
       </div>
     </section>
 
+    <!-- ============ 채팅방 (말풍선 대화) ============ -->
+    <section class="panel panel-chat" aria-labelledby="chatTitle">
+      <div class="panel-head">
+        <h2 id="chatTitle">회의 채팅방</h2>
+        <p class="panel-sub"><span id="chatCount">0</span>개 메시지 · 실시간</p>
+      </div>
+
+      <div class="chat-feed" id="chatFeed" role="log" aria-live="polite" aria-relevant="additions" aria-label="회의 채팅 메시지"></div>
+      <p class="empty chat-empty" id="chatEmpty">아직 메시지가 없어요. 첫 메시지를 보내 보세요.</p>
+
+      <form class="chat-form" id="formChat" autocomplete="off">
+        <label class="sr-only" for="chatText">메시지</label>
+        <input id="chatText" type="text" maxlength="120" placeholder="메시지를 입력하고 Enter" required>
+        <button type="submit" class="btn btn-primary chat-send">전송</button>
+      </form>
+    </section>
+
+    </div>
+
+    <div class="col col-side">
+
     <!-- ============ 출석 ============ -->
-    <section class="panel" aria-labelledby="attendTitle">
+    <section class="panel panel-attend" aria-labelledby="attendTitle">
       <div class="panel-head">
         <h2 id="attendTitle">출석 피클</h2>
         <p class="panel-sub"><span id="attendCount">0</span><span id="attendStatus"></span></p>
@@ -209,7 +232,7 @@
     </section>
 
     <!-- ============ 안건/할 일 ============ -->
-    <section class="panel" aria-labelledby="agendaTitle">
+    <section class="panel panel-agenda" aria-labelledby="agendaTitle">
       <div class="panel-head">
         <h2 id="agendaTitle">회의 안건 &amp; 공동 할 일</h2>
         <p class="panel-sub"><span id="itemProgress">0 / 0 완료</span></p>
@@ -243,30 +266,16 @@
       </form>
     </section>
 
-    <!-- ============ 타임라인 ============ -->
-    <section class="panel" aria-labelledby="timeTitle">
-      <div class="panel-head">
-        <h2 id="timeTitle">회의 타임라인</h2>
-        <p class="panel-sub">피클 의견 교환 · 메모</p>
-      </div>
-
-      <ol class="timeline" id="timeline"></ol>
-
-      <form class="inline-form" id="formNote" autocomplete="off">
-        <label class="sr-only" for="noteText">메모</label>
-        <input id="noteText" type="text" maxlength="120" placeholder="메모 남기기" required>
-        <button type="submit" class="btn btn-primary btn-sm">남기기</button>
-      </form>
-    </section>
+    </div>
 
   </main>
 
   <footer class="foot">
-    <span>데이터는 이 브라우저와 Firebase Realtime Database(초대받은 방)에 저장됩니다. 초대 링크를 받은 피클만 같은 회의실을 공유합니다.</span>
+    <span>채팅과 회의 기록은 이 브라우저와 Firebase Realtime Database(초대받은 방)에 저장됩니다. 초대 링크를 받은 피클만 같은 회의실을 공유합니다.</span>
     <span class="foot-dim">초대 전용 비공개 회의실</span>
   </footer>
 </div>
 
-<script src="app.js?v=20261128a"></script>
+<script src="app.js?v=20261128b"></script>
 </body>
 </html>
