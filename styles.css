@@ -760,7 +760,11 @@ input:focus, select:focus {
   font-weight: 800;
   letter-spacing: .2px;
   color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
+.lock-ico { width: 14px; height: 14px; flex: 0 0 auto; }
 .lock-card h1 {
   margin: 0;
   font-size: clamp(20px, 5vw, 24px);
