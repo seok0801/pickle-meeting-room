@@ -57,7 +57,7 @@ body {
   height: 100dvh;
   min-height: 100dvh;
   margin: 0 auto;
-  padding: clamp(12px, 2.4vw, 22px) clamp(12px, 2.4vw, 22px) calc(86px + env(safe-area-inset-bottom, 0px));
+  padding: clamp(12px, 2.4vw, 22px) clamp(12px, 2.4vw, 22px) calc(92px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: clamp(10px, 1.4vw, 16px);
@@ -293,10 +293,10 @@ body {
 }
 .dock-badge {
   position: absolute;
-  top: 5px;
+  top: 3px;
   left: 50%;
-  -webkit-transform: translateX(6px);
-  transform: translateX(6px);
+  -webkit-transform: translateX(10px);
+  transform: translateX(10px);
   min-width: 17px;
   height: 17px;
   padding: 0 5px;
