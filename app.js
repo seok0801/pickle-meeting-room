@@ -485,8 +485,41 @@
     });
 
     var last = items.length ? items[items.length - 1].id : null;
-    chatEmpty.hidden = items.length > 0;
-    chatFeed.hidden = items.length === 0;
+
+    // 진행 중(작업중) 피클이 있으면 입력창 위에 움직이는 ••• 타이핑 말풍선을 띄웁니다.
+    // 상태가 온라인/대기로 돌아오면 다음 렌더에서 바로 사라집니다.
+    var working = state.pickles.filter(function (p) { return p.status === 'working'; });
+    working.forEach(function (p) {
+      var row = el('div', 'msg msg-typing');
+      row.setAttribute('aria-label', p.name + ' 작업 중');
+
+      var body = el('div', 'msg-body');
+      body.appendChild(el('span', 'msg-name', p.name));
+
+      var line = el('div', 'msg-line');
+      var bubble = el('div', 'msg-bubble typing-bubble');
+      var dots = el('span', 'typing-dots');
+      dots.setAttribute('aria-hidden', 'true');
+      dots.appendChild(el('i'));
+      dots.appendChild(el('i'));
+      dots.appendChild(el('i'));
+      bubble.appendChild(dots);
+      bubble.appendChild(el('span', 'typing-text',
+        p.name + (p.role ? ' · ' + p.role : '이(가)') + ' 처리 중…'));
+      line.appendChild(bubble);
+      body.appendChild(line);
+
+      var av = el('span', 'msg-av');
+      av.innerHTML = chatAvatar(p.name);
+      av.setAttribute('aria-hidden', 'true');
+
+      row.appendChild(av);
+      row.appendChild(body);
+      chatFeed.appendChild(row);
+    });
+    var hasAny = items.length > 0 || working.length > 0;
+    chatEmpty.hidden = hasAny;
+    chatFeed.hidden = !hasAny;
     chatCount.textContent = items.length;
 
     if (chatFeed.hidden) { lastChatId = last; return; }
