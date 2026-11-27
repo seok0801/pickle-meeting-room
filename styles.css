@@ -54,12 +54,14 @@ body {
 .app {
   width: 100%;
   max-width: 820px;
-  margin: 0 auto;
+  height: 100dvh;
   min-height: 100dvh;
+  margin: 0 auto;
   padding: clamp(12px, 2.4vw, 22px) clamp(12px, 2.4vw, 22px) calc(104px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: clamp(10px, 1.4vw, 16px);
+  overflow: hidden;
 }
 .app[hidden] { display: none; }
 
@@ -232,10 +234,13 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 /* 한 번에 한 패널만 — 독으로 화면을 전환합니다. */
 .view > .panel { display: none; }
-.view > .panel.is-active { display: flex; }
+.view > .panel.is-active { display: flex; min-height: 0; }
+.panel-agenda.is-active,
+.panel-attend.is-active { overflow-y: auto; overscroll-behavior: contain; }
 
 /* ---------- floating dock ---------- */
 .dock {
