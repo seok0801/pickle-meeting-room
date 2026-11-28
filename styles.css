@@ -1866,3 +1866,14 @@ body[data-mode="ai"] .ptr-pill { border-color: #3D5273; background: rgba(9, 16, 
   .mode-emoji { font-size: 11px; }
 }
 
+/* 좁은 폭에서는 헤더 제목이 끊기지 않게 동기화 칩을 점만 남깁니다. */
+@media (max-width: 480px) {
+  .sync-chip { padding: 6px; gap: 0; }
+  .sync-chip #syncChipText { display: none; }
+  .sync-chip .dot { width: 9px; height: 9px; }
+  .brand-text strong { font-size: 14px; }
+}
+
+/* 사단 탭에서는 사단 현황 바가 상태별 인원을 보여 주므로 상단 중복 숫자는 숨깁니다. */
+body[data-mode="ai"] .panel-attend .panel-sub #attendStatus { display: none; }
+
