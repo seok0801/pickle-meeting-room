@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>PMR 미리보기 (390×844)</title>
+<meta name="robots" content="noindex">
+<style>
+  html, body { margin: 0; padding: 0; background: #1b1b1b; }
+  #device { width: 390px; height: 844px; border: 0; display: block; background: #fff; }
+</style>
+</head>
+<body>
+<!-- 모바일 화면 점검용 틀: 주소 뒤 # 뒤에 인코딩한 회의실 주소를 붙이면 그 화면을 390×844로 띄웁니다. -->
+<iframe id="device" title="미리보기" src="about:blank"></iframe>
+<script>
+  (function () {
+    var raw = location.hash.replace(/^#/, '');
+    var target = './index.html';
+    if (raw) { try { target = decodeURIComponent(raw); } catch (e) { target = raw; } }
+    if (!/^(https?:)?\//.test(target) && target.indexOf('index.html') !== 0) target = './index.html';
+    document.getElementById('device').src = target;
+  })();
+</script>
+</body>
+</html>
