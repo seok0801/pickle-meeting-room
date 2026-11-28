@@ -2182,20 +2182,34 @@
   (function syncViewport() {
     var vv = window.visualViewport;
     var root = document.documentElement;
+    // 키보드가 닫혀 있을 때의 보이는 높이(기준값).
+    // iOS 홈화면 PWA는 키보드가 올라오면 innerHeight와 visualViewport.height가 함께 줄어들어
+    // 두 값의 비율(vv.height / innerHeight)로는 키보드를 알아챌 수 없습니다. 그래서 '닫힌 때의 높이'와 비교합니다.
+    var baseHeight = 0;
+
+    function editing() {
+      var a = document.activeElement;
+      if (!a) return false;
+      var tag = (a.tagName || '').toLowerCase();
+      return tag === 'input' || tag === 'textarea' || tag === 'select' || a.isContentEditable === true;
+    }
+
     function apply() {
       var inner = window.innerHeight || 0;
-      var h = inner;
-      var top = 0;
-      if (vv) {
-        h = Math.min(vv.height, inner || vv.height);
-        top = Math.max(0, Math.round(vv.offsetTop || 0));
-      }
+      var vvH = vv ? (vv.height || 0) : 0;
+      var h = vvH ? Math.min(vvH, inner || vvH) : inner;
+      var top = vv ? Math.max(0, Math.round(vv.offsetTop || 0)) : 0;
       if (h > 0) {
         root.style.setProperty('--app-vh', Math.round(h) + 'px');
         root.style.setProperty('--app-top', top + 'px');
       }
-      // 키보드가 올라온 상태 — 보이는 높이가 창 높이의 78%보다 작아졌을 때
-      var kb = !!(vv && inner > 0 && vv.height < inner * 0.78);
+      var isKb = root.classList.contains('is-kb');
+      // 기준 높이는 화면이 커졌거나(키보드 닫힘) 키보드와 무관한 창 크기 변화일 때만 갱신합니다.
+      if (!baseHeight || h > baseHeight || (!editing() && !isKb)) baseHeight = h;
+      // 키보드가 올라온 상태 — 닫힌 때 높이의 82%보다 작아졌거나,
+      // 입력 중인데 높이가 140px 넘게 줄었을 때. (iOS PWA는 두 높이가 함께 줄어듭니다)
+      var kb = baseHeight > 0 && h > 0 &&
+        (h < baseHeight * 0.82 || (editing() && h < baseHeight - 140));
       var wasKb = root.classList.contains('is-kb');
       root.classList.toggle('is-kb', kb);
       // iOS가 문서를 살짝 밀어 놓아도 헤더가 위로 사라지지 않게 되돌립니다.
@@ -2208,10 +2222,28 @@
         // 키보드가 내려가면 독이 다시 나타나므로 입력창 높이를 다시 재고 채팅 맨 아래로 맞춥니다.
         autoResize();
       }
+      // 키보드가 열리고 닫히는 애니메이션 동안 높이가 여러 번 바뀌므로, 끝날 즈음에도 한 번 더 맞춥니다.
+      if (kb !== wasKb) {
+        setTimeout(apply, 120);
+        setTimeout(apply, 360);
+      }
     }
     apply();
     window.addEventListener('resize', apply);
-    window.addEventListener('orientationchange', function () { setTimeout(apply, 250); });
+    window.addEventListener('orientationchange', function () {
+      // 화면을 돌리면 기준 높이 자체가 바뀌므로 다시 잽니다.
+      baseHeight = 0;
+      setTimeout(apply, 60);
+      setTimeout(apply, 250);
+    });
+    // 입력창을 누른 순간부터 키보드 애니메이션이 끝날 때까지 높이·is-kb·채팅 하단을 따라갑니다.
+    ['focusin', 'focusout'].forEach(function (ev) {
+      document.addEventListener(ev, function () {
+        setTimeout(apply, 60);
+        setTimeout(apply, 220);
+        setTimeout(apply, 420);
+      }, true);
+    });
     if (vv) {
       vv.addEventListener('resize', apply);
       vv.addEventListener('scroll', apply);
@@ -2233,7 +2265,7 @@
 
   // 화면 검증용 최소 상태(비밀값 없음) — 자동 점검이 앱이 끝까지 실행됐는지 확인합니다.
   window.__PMR = {
-    version: '20261128z5',
+    version: '20261128z6',
     ready: true,
     mode: function () { return CURRENT_MODE; },
     tab: function () { return currentTab; },
@@ -2273,6 +2305,9 @@
         appPos: app ? window.getComputedStyle(app).position : null,
         appHeight: app ? Math.round(app.getBoundingClientRect().height) : 0,
         dockHidden: dock ? window.getComputedStyle(dock).display === 'none' : null,
+        appPadBottom: app ? Math.round(parseFloat(window.getComputedStyle(app).paddingBottom) || 0) : 0,
+        appBottom: app ? Math.round(app.getBoundingClientRect().bottom) : 0,
+        composerBottom: $('#formChat') ? Math.round($('#formChat').getBoundingClientRect().bottom) : 0,
         feedScrollable: feed ? feed.scrollHeight > feed.clientHeight : null,
         kb: document.documentElement.classList.contains('is-kb'),
         innerHeight: window.innerHeight,
