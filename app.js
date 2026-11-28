@@ -164,6 +164,36 @@
     }).map(function (k) { return v[k]; });
   }
 
+  // ts가 빠진 항목을 Date.now()로 채우면 정렬(a.ts - b.ts)에서 맨 아래로 튀어
+  // 그 뒤에 온 정상 응답까지 가립니다(외부 봇이 ts 없이 쓴 메시지에서 실제 발생).
+  // 그래서 배열 안 원래 위치를 지키는 시각을 채웁니다.
+  //  · 유효한 ts(양수)는 그대로 둡니다.
+  //  · 누락 항목은 앞 항목 ts+1, 배열 맨 앞이면 뒤의 첫 유효 ts-1(유효 ts가 하나도 없으면 0,1,2…).
+  function fillMissingTs(list) {
+    var out = [];
+    var i, ts, last = null, next = null, any = false;
+    for (i = 0; i < list.length; i++) {
+      ts = Number(list[i] && list[i].ts);
+      out[i] = ts > 0 ? ts : null;
+      if (out[i] !== null) any = true;
+    }
+    if (!any) {
+      for (i = 0; i < list.length; i++) out[i] = i;
+      return out;
+    }
+    // 앞에서부터 — 앞 항목 ts+1 로 이어 붙입니다.
+    for (i = 0; i < list.length; i++) {
+      if (out[i] === null && last !== null) out[i] = last + 1;
+      if (out[i] !== null) last = out[i];
+    }
+    // 맨 앞쪽에서 아직 빈 자리(앞에 유효 ts가 없던 자리)는 뒤 ts-1 로 채웁니다(1970년 표시 방지).
+    for (i = list.length - 1; i >= 0; i--) {
+      if (out[i] === null) out[i] = Math.max(1, next - 1);
+      next = out[i];
+    }
+    return out;
+  }
+
   function normalize(s) {
     if (!s || typeof s !== 'object') return null;
     var out = {
@@ -183,24 +213,26 @@
         status: normalizeStatus(p.status)
       });
     });
-    asList(s.items).forEach(function (it) {
-      if (!it || typeof it.title !== 'string' || !it.title.trim()) return;
+    var items = asList(s.items).filter(function (it) { return !!(it && typeof it.title === 'string' && it.title.trim()); });
+    var itemTs = fillMissingTs(items);
+    items.forEach(function (it, i) {
       out.items.push({
         id: String(it.id || uid('i')),
         title: String(it.title).slice(0, 160),
         type: it.type === 'todo' ? 'todo' : 'agenda',
         done: !!it.done,
         owner: typeof it.owner === 'string' ? it.owner.slice(0, 24) : '',
-        ts: Number(it.ts) || Date.now()
+        ts: itemTs[i]
       });
     });
-    asList(s.timeline).forEach(function (m) {
-      if (!m || typeof m.text !== 'string' || !m.text.trim()) return;
+    var timeline = asList(s.timeline).filter(function (m) { return !!(m && typeof m.text === 'string' && m.text.trim()); });
+    var timelineTs = fillMissingTs(timeline);
+    timeline.forEach(function (m, i) {
       out.timeline.push({
         id: String(m.id || uid('t')),
         who: String(m.who || '피클').slice(0, 24),
         text: String(m.text).slice(0, 400),
-        ts: Number(m.ts) || Date.now(),
+        ts: timelineTs[i],
         kind: m.kind === 'note' ? 'note' : 'pickle'
       });
     });
