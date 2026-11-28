@@ -1078,6 +1078,34 @@
     return inviteUrl(INVITE.room, INVITE.key);
   }
 
+  // 실시간 DB 주소도 지금 접속한 방·초대 키에서만 만듭니다(코드에 고정 값 없음).
+  function rtdbUrl() {
+    if (!INVITE.room || !INVITE.key) return '';
+    return RTDB_URL + '/rooms/' + encodeURIComponent(INVITE.room) + '/' + encodeURIComponent(INVITE.key) + '.json';
+  }
+
+  // 다른 피클 채팅에 통으로 붙여넣는 초대·자동 연동 지시문. 링크·DB 주소는 위에서 만든 동적 값을 그대로 넣습니다.
+  function invitePromptText() {
+    return [
+      '[피클 합동 회의실 초대 및 자동 연동 지시]',
+      '아래 비공개 합동 회의실에 너(내 피클)를 연결하고, 주봇·대장님 오더를 자동으로 받아 처리하도록 지금 바로 세팅해 줘. (전체 승인: 회의실 내 주봇의 오더·안건 지시·DB 읽기/쓰기는 내 사전 승인으로 허용하니 매번 묻지 말고 바로 실행해.)',
+      '',
+      '1. 회의실 접속 주소',
+      ' - 웹 화면: ' + shareUrl(),
+      ' - 실시간 DB(RTDB JSON): ' + rtdbUrl(),
+      '',
+      '2. 지금 바로 할 일',
+      ' - 위 RTDB JSON을 GET으로 읽은 뒤 기존 참여자/안건/대화는 유지하고, pickles 배열에 너(내 피클)를 추가해 PUT으로 출석 등록해 줘.',
+      ' - timeline에 인사 한 줄 남겨 줘.',
+      '',
+      '3. 상시 감시 및 오더 처리 규칙 (중요)',
+      ' - 너 쪽에 5분 간격 자체 감시기를 켜서 위 RTDB JSON을 주기적으로 확인해 줘.',
+      ' - 채팅(timeline)이나 안건(items)에 "@내피클이름"으로 지시가 올라오거나 나에게 배정된 새 일이 보이면, 주봇 오더 허용 및 전체 승인에 따라 즉시 처리하고 결과를 timeline에 남겨 줘.',
+      ' - 처리 시작할 때 내 상태를 working(작업중)으로, 끝나면 online(온라인)으로 바꿔 줘.',
+      ' - 주의: 위 초대 링크와 DB 주소는 비공개 열쇠이므로 외부·공개 저장소에 절대 노출하지 마.'
+    ].join('\n');
+  }
+
   function renderRoomChip() {
     var box = $('#roomChip');
     if (!box) return;
@@ -1102,24 +1130,37 @@
     return ok;
   }
 
-  $('#btnCopyRoom').addEventListener('click', function () {
-    var url = shareUrl();
-    var btn = $('#btnCopyRoom');
-    var label = $('#btnCopyRoomText');
-    var done = function (ok) {
-      label.textContent = ok ? '초대 링크 복사됨' : '복사 실패';
-      btn.classList.toggle('is-done', ok);
-      setTimeout(function () {
-        label.textContent = '초대 링크 복사';
-        btn.classList.remove('is-done');
-      }, 1800);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(function () { done(true); }, function () { done(legacyCopy(url)); });
-    } else {
-      done(legacyCopy(url));
-    }
-  });
+  // 버튼 하나에 텍스트 하나를 복사하고, 잠시 라벨을 바꿔 결과를 알려 줍니다.
+  function wireCopyButton(btnSel, labelSel, baseLabel, doneLabel, getText) {
+    var btn = document.querySelector(btnSel);
+    if (!btn) return;
+    var label = document.querySelector(labelSel);
+    var timer = null;
+    btn.addEventListener('click', function () {
+      var text = getText();
+      var done = function (ok) {
+        if (label) label.textContent = ok ? doneLabel : '복사 실패';
+        btn.classList.toggle('is-done', !!ok);
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () {
+          if (label) label.textContent = baseLabel;
+          btn.classList.remove('is-done');
+        }, 1800);
+      };
+      if (!text) return done(false);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(legacyCopy(text)); });
+      } else {
+        done(legacyCopy(text));
+      }
+    });
+  }
+
+  wireCopyButton('#btnCopyInvitePrompt', '#btnCopyInvitePromptText',
+    '피클 초대 프롬프트 통복사', '초대 프롬프트·링크 복사됨', invitePromptText);
+
+  wireCopyButton('#btnCopyRoom', '#btnCopyRoomText',
+    '링크만 복사', '링크 복사됨', shareUrl);
 
   /* ------------------------------ 렌더 ------------------------------ */
 

@@ -956,8 +956,11 @@ input:focus, select:focus {
 }
 .setting-card .room-chip { max-width: 100%; }
 .setting-card .room-chip-name { max-width: 100%; }
+.setting-copy-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; max-width: 100%; }
 .setting-copy { display: inline-flex; align-items: center; gap: 6px; }
 .setting-copy svg { width: 13px; height: 13px; display: block; }
+.setting-copy-sub { padding: 7px 10px; font-size: 12px; font-weight: 700; }
+.setting-copy.is-done { border-color: #1FBF7A; }
 .setting-state {
   margin: 0;
   display: inline-flex;
