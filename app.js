@@ -909,7 +909,7 @@
         return;
       }
       if (!res.body) { startPolling(); return; }
-      chip('online', '실시간 동기화');
+      chip('online', '실시간 동기화 중');
       var reader = res.body.getReader();
       var dec = new TextDecoder();
       var buf = '';
