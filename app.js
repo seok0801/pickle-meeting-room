@@ -900,6 +900,8 @@
 
       var line = el('div', 'msg-line');
       var bubble = el('div', 'msg-bubble');
+      fillBubble(bubble, m.text);
+      // 사진은 글보다 위에 — fillBubble이 글자를 새로 그린 다음에 끼워 넣습니다.
       var img = safeImage(m.image);
       if (img) {
         bubble.classList.add('has-photo');
@@ -912,9 +914,9 @@
         im.loading = 'lazy';
         im.decoding = 'async';
         shot.appendChild(im);
-        bubble.appendChild(shot);
+        if (bubble.firstChild) bubble.insertBefore(shot, bubble.firstChild);
+        else bubble.appendChild(shot);
       }
-      fillBubble(bubble, m.text);
       bubble.title = day + ' ' + fmtTime(m.ts);
       var time = el('span', 'msg-time', fmtTime(m.ts));
       if (mine) {
@@ -2231,7 +2233,7 @@
 
   // 화면 검증용 최소 상태(비밀값 없음) — 자동 점검이 앱이 끝까지 실행됐는지 확인합니다.
   window.__PMR = {
-    version: '20261128z4',
+    version: '20261128z5',
     ready: true,
     mode: function () { return CURRENT_MODE; },
     tab: function () { return currentTab; },
