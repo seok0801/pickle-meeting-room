@@ -1675,5 +1675,5 @@
   });
 
   // 화면 검증용 최소 상태(비밀값 없음) — 자동 점검이 앱이 끝까지 실행됐는지 확인합니다.
-  window.__PMR = { version: '20261128u', ready: true, mode: function () { return CURRENT_MODE; } };
+  window.__PMR = { version: '20261128w', ready: true, mode: function () { return CURRENT_MODE; } };
 })();
