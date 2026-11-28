@@ -1100,10 +1100,7 @@
       if (input.value.length > MAX_CHAT_TEXT) return;
       e.preventDefault();
       if (!input.value.trim() && !pendingImage) return;
-      var form = $('#formChat');
-      if (!form) return;
-      if (typeof form.requestSubmit === 'function') form.requestSubmit();
-      else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      sendChat();
     });
 
     // 클립보드에 이미지가 있으면 가로채 첨부합니다(스크린샷 복사 → 붙여넣기).
@@ -1144,9 +1141,11 @@
     }
   })();
 
-  $('#formChat').addEventListener('submit', function (e) {
-    e.preventDefault();
+  // 전송 — <form> submit 대신 버튼 click과 Enter 키가 이 함수를 직접 부릅니다.
+  // (iOS가 키보드 위에 ^ v ✓ 폼 이동 바를 띄우지 않도록 입력 영역을 form 밖에 둔 구조에 맞춤)
+  function sendChat() {
     var input = $('#chatText');
+    if (!input) return;
     var text = input.value.trim();
     var image = pendingImage;
     if (!text && !image) { input.focus(); return; }
@@ -1160,7 +1159,17 @@
     renderChat();
     if (chatFeed) chatFeed.scrollTop = chatFeed.scrollHeight;
     input.focus();
-  });
+  }
+
+  (function wireSend() {
+    var btn = $('#btnChatSend');
+    if (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        sendChat();
+      });
+    }
+  })();
 
   /* ------------------------------ 사진 확대 보기 ------------------------------ */
 
@@ -1204,6 +1213,13 @@
     return document.querySelector('.view > .panel[data-panel="' + tab + '"]');
   }
 
+  // iOS 폼 탐색(inert) — 화면에 없는 패널의 입력·버튼은 폼 이동 바 대상에서 빼 버립니다.
+  function setInert(el, on) {
+    if (!el) return;
+    if (on) el.setAttribute('inert', '');
+    else el.removeAttribute('inert');
+  }
+
   // 채팅 → 안건 → 참가자 화면을 한 번에 하나씩 보여 줍니다. 기본 첫 화면은 채팅입니다.
   function showTab(tab, focusInput) {
     if (PANEL_TABS.indexOf(tab) < 0) tab = 'chat';
@@ -1216,6 +1232,7 @@
       var on = t === tab;
       p.classList.toggle('is-active', on);
       p.setAttribute('aria-hidden', on ? 'false' : 'true');
+      setInert(p, !on);   // 활성 패널에서만 inert 제거
     });
     dockButtons.forEach(function (b) {
       var on = b.dataset.tab === tab;
@@ -1803,7 +1820,9 @@
     ENTERED = false;
     document.body.classList.add('is-locked');
     if (appRoot) appRoot.hidden = true;
+    setInert(appRoot, true);
     if (lockScreen) lockScreen.hidden = false;
+    setInert(lockScreen, false);
     if (msg) setLockStatus(msg, kind || 'error');
     // 관제실 초대(ai_...)로 들어온 경우에는 잠금 화면 제목도 관제실로 맞춥니다.
     var lt = $('#lockTitle');
@@ -1816,7 +1835,9 @@
     ENTERED = true;
     document.body.classList.remove('is-locked');
     if (lockScreen) lockScreen.hidden = true;
+    setInert(lockScreen, true);
     if (appRoot) appRoot.hidden = false;
+    setInert(appRoot, false);
     setLockStatus('', null);
     lastChatId = null;   // 화면에 처음 나타날 때는 채팅 맨 아래부터 보여 줍니다
     renderRoomChip();
@@ -2265,7 +2286,7 @@
 
   // 화면 검증용 최소 상태(비밀값 없음) — 자동 점검이 앱이 끝까지 실행됐는지 확인합니다.
   window.__PMR = {
-    version: '20261128z6',
+    version: '20261128z7',
     ready: true,
     mode: function () { return CURRENT_MODE; },
     tab: function () { return currentTab; },
@@ -2312,6 +2333,35 @@
         kb: document.documentElement.classList.contains('is-kb'),
         innerHeight: window.innerHeight,
         vvHeight: window.visualViewport ? Math.round(window.visualViewport.height) : null
+      };
+    },
+    // iOS 폼 이동 바 억제 상태 — 채팅 입력 영역 태그와 패널 inert 여부(비밀값 없음)
+    formAccessory: function () {
+      var f = $('#formChat');
+      var panels = {};
+      PANEL_TABS.forEach(function (t) {
+        var p = panelOf(t);
+        panels[t] = p ? { inert: p.hasAttribute('inert'), active: p.classList.contains('is-active') } : null;
+      });
+      var lock = $('#lockScreen');
+      var app = $('#appRoot');
+      return {
+        chatFormTag: f ? f.tagName.toLowerCase() : null,
+        chatFormIsForm: f ? f.tagName === 'FORM' : null,
+        sendBtnType: $('#btnChatSend') ? ($('#btnChatSend').getAttribute('type') || 'submit') : null,
+        panels: panels,
+        lockInert: lock ? lock.hasAttribute('inert') : null,
+        appInert: app ? app.hasAttribute('inert') : null,
+        assistableFields: (function () {
+          var all = document.querySelectorAll('input:not([type="hidden"]):not([hidden]), textarea, select');
+          var out = [];
+          for (var i = 0; i < all.length; i++) {
+            var n = all[i];
+            if (!n.offsetParent && n.tagName !== 'BODY') continue;   // display:none 안쪽은 제외
+            out.push(n.id || n.tagName.toLowerCase());
+          }
+          return out;
+        })()
       };
     },
     refresh: refreshNow,

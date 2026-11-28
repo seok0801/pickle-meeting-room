@@ -7,7 +7,7 @@
 <meta name="description" content="귀여운 피클들이 함께 모여 회의하는 합동 회의실. 출석 보드, 회의 안건·할 일, 실시간 말풍선 채팅방. AI 사단 통합 관제실 모드 포함.">
 <meta name="theme-color" content="#FFD84D">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css?v=20261128z6">
+<link rel="stylesheet" href="styles.css?v=20261128z7">
 <script>
 /* 화면 검증용 최소 오류 기록 — 오류 메시지만 html[data-js-errors]에 모읍니다(데이터·비밀값 없음). */
 (function () {
@@ -46,7 +46,7 @@
   </div>
 </section>
 
-<div class="app" id="appRoot" hidden>
+<div class="app" id="appRoot" hidden inert>
 
   <!-- 당겨서 새로고침 인디케이터 (손가락을 따라 내려옵니다) -->
   <div class="ptr" id="ptrIndicator" data-state="idle" aria-hidden="true">
@@ -115,17 +115,19 @@
         <button type="button" class="photo-chip-x" id="photoChipRemove" aria-label="첨부한 사진 빼기" title="첨부한 사진 빼기">×</button>
       </div>
 
-      <form class="chat-form" id="formChat" autocomplete="off">
+      <!-- iOS 폼 이동 바(^ v ✓) 억제: 입력 영역을 <form>이 아닌 div로 두어 WebKit이 폼 컨트롤 사이를
+           탐색하지 않게 합니다. 전송은 버튼 click과 Enter 키가 sendChat()을 직접 부릅니다. -->
+      <div class="chat-form" id="formChat" role="form" aria-label="메시지 보내기" autocomplete="off">
         <label class="sr-only" for="chatText">메시지</label>
         <button type="button" class="chat-photo" id="btnPhoto" aria-label="사진 첨부" title="사진 첨부 (Ctrl+V 붙여넣기도 됩니다)">📷</button>
         <input type="file" id="chatPhotoInput" accept="image/*" hidden>
         <textarea id="chatText" rows="1" maxlength="8000" placeholder="메시지를 입력하고 Enter" enterkeyhint="send" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
-        <button type="submit" class="btn btn-primary chat-send">전송</button>
-      </form>
+        <button type="button" class="btn btn-primary chat-send" id="btnChatSend">전송</button>
+      </div>
     </section>
 
     <!-- ============ 안건 / 일감 큐 ============ -->
-    <section class="panel panel-agenda" id="panelAgenda" data-panel="agenda" aria-labelledby="agendaTitle">
+    <section class="panel panel-agenda" id="panelAgenda" data-panel="agenda" aria-labelledby="agendaTitle" aria-hidden="true" inert>
       <div class="panel-head">
         <h2 id="agendaTitle">회의 안건 &amp; 공동 할 일</h2>
         <p class="panel-sub"><span id="itemProgress">0 / 0 완료</span></p>
@@ -160,7 +162,7 @@
     </section>
 
     <!-- ============ 참가자 (출석 피클 / 사단 에이전트) ============ -->
-    <section class="panel panel-attend" id="panelAttend" data-panel="attend" aria-labelledby="attendTitle">
+    <section class="panel panel-attend" id="panelAttend" data-panel="attend" aria-labelledby="attendTitle" aria-hidden="true" inert>
       <div class="panel-head">
         <h2 id="attendTitle">접속자 · 출석 피클</h2>
         <p class="panel-sub"><span id="attendCount">0</span><span id="attendStatus"></span></p>
@@ -204,7 +206,7 @@
     </section>
 
     <!-- ============ 설정 (회의실·연결·데이터) ============ -->
-    <section class="panel panel-settings" id="panelSettings" data-panel="settings" aria-labelledby="settingsTitle">
+    <section class="panel panel-settings" id="panelSettings" data-panel="settings" aria-labelledby="settingsTitle" aria-hidden="true" inert>
       <div class="panel-head">
         <h2 id="settingsTitle">회의실 설정</h2>
         <p class="panel-sub">초대 · 연결 · 데이터</p>
@@ -317,6 +319,6 @@
   </form>
 </dialog>
 
-<script src="app.js?v=20261128z6"></script>
+<script src="app.js?v=20261128z7"></script>
 </body>
 </html>
