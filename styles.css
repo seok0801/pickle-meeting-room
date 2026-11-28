@@ -404,6 +404,12 @@ body {
 }
 .attend-face svg { width: 26px; height: 27px; }
 .attend-meta { min-width: 0; flex: 1 1 auto; }
+.attend-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
 .attend-name {
   font-size: 13.5px;
   font-weight: 800;
@@ -434,11 +440,47 @@ body {
   background-color: #fff;
   color: var(--ink-2);
   cursor: pointer;
-  max-width: 92px;
+  max-width: 118px;
 }
-.status-select[data-status="online"] { background-color: #EAFBF2; border-color: #BDEBD5; color: #0C7A4C; }
-.status-select[data-status="working"] { background-color: #FFF6DA; border-color: #F5DE9A; color: #7A5A00; }
-.status-select[data-status="away"] { background-color: #F2F1EE; border-color: #DEDAD0; color: #6B6558; }
+.status-select[data-status="online"] { background-color: #E9F9EF; border-color: #B7E7C6; color: #15803D; }
+.status-select[data-status="working"] { background-color: #E9F0FF; border-color: #BFD3FF; color: #1D4ED8; }
+.status-select[data-status="exhausted"] { background-color: #FFF2E4; border-color: #FBD0A6; color: #C2410C; }
+.status-select[data-status="offline"] { background-color: #FDEDED; border-color: #F8C6C6; color: #B91C1C; }
+
+/* ---------- 상태 표시등 (접속 초록·작업중 파랑·한도 소진 주황·접속 끊김 빨강) ---------- */
+.status-dot {
+  flex: 0 0 auto;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #9A9384;
+  box-shadow: 0 0 0 2px #FFFDF8, 0 0 0 3px rgba(42, 36, 24, .12);
+}
+.status-dot[data-status="online"] { background: #16A34A; box-shadow: 0 0 0 2px #FFFDF8, 0 0 0 3px rgba(22, 163, 74, .28); }
+.status-dot[data-status="working"] { background: #2563EB; animation: statusPulseBlue 1.25s ease-in-out infinite; }
+.status-dot[data-status="exhausted"] { background: #F97316; box-shadow: 0 0 0 2px #FFFDF8, 0 0 0 3px rgba(249, 115, 22, .32); }
+.status-dot[data-status="offline"] { background: #DC2626; box-shadow: 0 0 0 2px #FFFDF8, 0 0 0 3px rgba(220, 38, 38, .26); }
+@keyframes statusPulseBlue {
+  0%, 100% { box-shadow: 0 0 0 2px #FFFDF8, 0 0 0 3px rgba(37, 99, 235, .48); }
+  50% { box-shadow: 0 0 0 2px #FFFDF8, 0 0 0 6px rgba(37, 99, 235, .10); }
+}
+
+.status-sum {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.status-sum-dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.status-sum[data-status="online"] { color: #15803D; }
+.status-sum[data-status="working"] { color: #1D4ED8; }
+.status-sum[data-status="exhausted"] { color: #C2410C; }
+.status-sum[data-status="offline"] { color: #B91C1C; }
 
 .attend-del {
   border: 0;
@@ -892,12 +934,27 @@ input:focus, select:focus {
 }
 .target-dot {
   flex: 0 0 auto;
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   border: 1.5px solid #fff;
   box-shadow: 0 0 0 1px rgba(42, 36, 24, .16);
+  transition: background .15s ease;
 }
+.target-dot[data-status="working"] { animation: targetBlink 1.3s ease-in-out infinite; }
+@keyframes targetBlink { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+.target-state {
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #F2F1EE;
+  color: #6B6558;
+  font-size: 10px;
+  font-weight: 800;
+}
+.target-state[data-status="working"] { background: #E9F0FF; color: #1D4ED8; }
+.target-state[data-status="exhausted"] { background: #FFF2E4; color: #C2410C; }
+.target-state[data-status="offline"] { background: #FDEDED; color: #B91C1C; }
+.target-chip.is-active .target-state { background: rgba(255, 255, 255, .26); color: #fff; }
 .target-work {
   padding: 1px 5px;
   border-radius: 999px;
@@ -1169,7 +1226,7 @@ input:focus, select:focus {
   .attend-pick { gap: 8px; }
   .attend-face { width: 32px; height: 32px; border-radius: 10px; }
   .attend-face svg { width: 23px; height: 24px; }
-  .status-select { max-width: 84px; padding: 4px 6px 4px 8px; font-size: 11.5px; }
+  .status-select { max-width: 108px; padding: 4px 6px 4px 8px; font-size: 11.5px; }
 
   .chat-feed { padding: 14px 12px; }
 }

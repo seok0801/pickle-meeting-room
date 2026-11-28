@@ -54,8 +54,24 @@
     { body: '#D6E96B', ear: '#7A8F1F', ring: '#F2F8CC' }
   ];
 
-  var STATUS_LABEL = { online: '온라인', working: '작업중', away: '대기' };
-  var STATUS_ORDER = ['online', 'working', 'away'];
+  // 상태 표시등 — 초록(접속) · 파랑(작업중) · 주황(한도 소진) · 빨강(접속 끊김)
+  // RTDB 보안 규칙이 pickles[].status 문자열을 모두 허용하므로 DB 규칙은 그대로 둡니다.
+  // 예전 데이터의 away(대기)는 offline(접속 끊김)으로 읽어 옵니다.
+  var STATUS = {
+    online:    { label: '접속',      color: '#16A34A', option: '접속(초록)' },
+    working:   { label: '작업중',    color: '#2563EB', option: '작업중(파랑)' },
+    exhausted: { label: '한도 소진', color: '#F97316', option: '한도 소진(주황)' },
+    offline:   { label: '접속 끊김', color: '#DC2626', option: '접속 끊김(빨강)' }
+  };
+  var STATUS_ORDER = ['online', 'working', 'exhausted', 'offline'];
+  var STATUS_ALIAS = { away: 'offline' };
+
+  function normalizeStatus(v) {
+    var s = STATUS_ALIAS[v] || v;
+    return STATUS[s] ? s : 'online';
+  }
+  function statusLabel(s) { return (STATUS[s] || STATUS.online).label; }
+  function statusColor(s) { return (STATUS[s] || STATUS.online).color; }
 
   /* ------------------------------ 상태 ------------------------------ */
 
@@ -106,7 +122,7 @@
         name: String(p.name).slice(0, 24),
         role: typeof p.role === 'string' ? p.role.slice(0, 40) : '합류한 피클',
         color: Number.isFinite(p.color) ? ((Number(p.color) % PALETTE.length) + PALETTE.length) % PALETTE.length : i % PALETTE.length,
-        status: STATUS_LABEL[p.status] ? p.status : 'online'
+        status: normalizeStatus(p.status)
       });
     });
     (Array.isArray(s.items) ? s.items : []).forEach(function (it) {
@@ -206,17 +222,25 @@
       var face = el('span', 'attend-face');
       face.innerHTML = pickleSvg(colorOf(p), false);
 
+      li.dataset.status = p.status;
+
       var meta = el('div', 'attend-meta');
-      var nm = el('div', 'attend-name', p.name);
+      var nameRow = el('div', 'attend-name-row');
+      var dot = el('span', 'status-dot');
+      dot.dataset.status = p.status;
+      dot.title = statusLabel(p.status);
+      dot.setAttribute('aria-hidden', 'true');
+      nameRow.appendChild(dot);
+      nameRow.appendChild(el('span', 'attend-name', p.name));
       var rl = el('div', 'attend-role', p.role || '합류한 피클');
-      meta.appendChild(nm);
+      meta.appendChild(nameRow);
       meta.appendChild(rl);
 
       var right = el('div', 'attend-right');
       var sel = el('select', 'status-select');
       sel.setAttribute('aria-label', p.name + ' 상태');
       STATUS_ORDER.forEach(function (s) {
-        var o = el('option', null, STATUS_LABEL[s]);
+        var o = el('option', null, STATUS[s].option);
         o.value = s;
         if (p.status === s) o.selected = true;
         sel.appendChild(o);
@@ -225,10 +249,13 @@
       sel.addEventListener('change', function () {
         p.status = sel.value;
         sel.dataset.status = p.status;
-        react(p.name, STATUS_LABEL[p.status] + ' 상태로 바꿨어요');
+        li.dataset.status = p.status;
+        dot.dataset.status = p.status;
+        dot.title = statusLabel(p.status);
+        react(p.name, statusLabel(p.status) + ' 상태로 바꿨어요');
         save();
         renderAttendSummary();
-        renderTargets();   // 대상 칩 순서(온라인·작업중 우선)도 다시 맞춥니다
+        renderTargets();   // 대상 칩 색·순서(접속·작업중 우선)도 다시 맞춥니다
       });
 
       var del = el('button', 'attend-del', '×');
@@ -266,11 +293,26 @@
     renderTargetState();
   }
 
+  // 상단 요약 — "2마리 참석 · 접속 2" 처럼 상태별 인원을 표시합니다.
   function renderAttendSummary() {
     var n = state.pickles.length;
-    var online = state.pickles.filter(function (p) { return p.status === 'online'; }).length;
     attendCount.textContent = n + '마리 참석';
-    $('#attendStatus').textContent = ' · 온라인 ' + online;
+    var box = $('#attendStatus');
+    if (!box) return;
+    box.textContent = '';
+    var first = true;
+    STATUS_ORDER.forEach(function (s) {
+      var c = state.pickles.filter(function (p) { return p.status === s; }).length;
+      if (!c) return;
+      if (!first) box.appendChild(document.createTextNode(' · '));
+      first = false;
+      var seg = el('span', 'status-sum');
+      seg.dataset.status = s;
+      seg.appendChild(el('i', 'status-sum-dot'));
+      seg.appendChild(document.createTextNode(statusLabel(s) + ' ' + c));
+      seg.title = statusLabel(s) + ' ' + c + '마리';
+      box.appendChild(seg);
+    });
   }
 
   /* ------------------------------ 안건 / 할 일 ------------------------------ */
@@ -413,7 +455,7 @@
 
   var pickTargetChips = $('#targetChips');
 
-  // 온라인 → 작업중 → 대기 순으로 정렬해 지금 일하는 피클을 앞에 둡니다.
+  // 접속 → 작업중 → 한도 소진 → 접속 끊김 순으로 정렬해 지금 일하는 피클을 앞에 둡니다.
   function orderedPickles() {
     return state.pickles.slice().sort(function (a, b) {
       return STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
@@ -438,15 +480,22 @@
       var chip = el('button', 'target-chip' + (on ? ' is-active' : ''));
       chip.type = 'button';
       chip.dataset.target = p.name;
-      chip.title = p.name + '에게 지시';
       chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+      // 점 색은 피클 고유색이 아니라 현재 상태 색(초록/파랑/주황/빨강) — 지금 누가 들어와 있는지 한눈에.
+      // 피클 고유색은 점 둘레의 얇은 링으로 남겨 두어 누구인지도 함께 읽힙니다.
       var c = colorOf(p);
       var dot = el('span', 'target-dot');
-      dot.style.background = c.body;
-      dot.style.borderColor = c.ear;
+      dot.dataset.status = p.status;
+      dot.style.background = statusColor(p.status);
+      dot.style.boxShadow = '0 0 0 1.5px ' + c.ear;
       chip.appendChild(dot);
       chip.appendChild(document.createTextNode(p.name));
-      if (p.status === 'working') chip.appendChild(el('span', 'target-work', '작업중'));
+      chip.title = p.name + '에게 지시 · ' + statusLabel(p.status);
+      if (p.status !== 'online') {
+        var st = el('span', 'target-state', statusLabel(p.status));
+        st.dataset.status = p.status;
+        chip.appendChild(st);
+      }
       wrap.appendChild(chip);
     });
 
@@ -623,7 +672,7 @@
     var last = items.length ? items[items.length - 1].id : null;
 
     // 진행 중(작업중) 피클이 있으면 입력창 위에 움직이는 ••• 타이핑 말풍선을 띄웁니다.
-    // 상태가 온라인/대기로 돌아오면 다음 렌더에서 바로 사라집니다.
+    // 상태가 접속 등 다른 상태로 돌아오면 다음 렌더에서 바로 사라집니다.
     var working = state.pickles.filter(function (p) { return p.status === 'working'; });
     working.forEach(function (p) {
       var row = el('div', 'msg msg-typing');
@@ -1101,7 +1150,8 @@
       '3. 상시 감시 및 오더 처리 규칙 (중요)',
       ' - 너 쪽에 5분 간격 자체 감시기를 켜서 위 RTDB JSON을 주기적으로 확인해 줘.',
       ' - 채팅(timeline)이나 안건(items)에 "@내피클이름"으로 지시가 올라오거나 나에게 배정된 새 일이 보이면, 주봇 오더 허용 및 전체 승인에 따라 즉시 처리하고 결과를 timeline에 남겨 줘.',
-      ' - 처리 시작할 때 내 상태를 working(작업중)으로, 끝나면 online(온라인)으로 바꿔 줘.',
+      ' - 처리 시작할 때 내 상태를 working(작업중)으로, 끝나면 online(접속)으로 바꿔 줘.',
+      ' - 만약 일일 사용량 한도에 다다르면 상태를 exhausted(한도 소진)로, 감시를 중단할 때는 offline(접속 끊김)으로 바꿔 줘.',
       ' - 주의: 위 초대 링크와 DB 주소는 비공개 열쇠이므로 외부·공개 저장소에 절대 노출하지 마.'
     ].join('\n');
   }
