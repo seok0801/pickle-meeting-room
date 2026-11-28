@@ -302,7 +302,11 @@
       var sel = el('select', 'status-select');
       sel.setAttribute('aria-label', p.name + ' 상태');
       STATUS_ORDER.forEach(function (s) {
-        var o = el('option', null, STATUS[s].option);
+        // 관제실에서는 상태 이름이 짧은 대시보드 라벨(접속·작업중·한도 소진·중단)을 씁니다.
+        var label = isAi()
+          ? { online: '접속', working: '작업중', exhausted: '한도 소진', offline: '중단' }[s]
+          : STATUS[s].option;
+        var o = el('option', null, label);
         o.value = s;
         if (p.status === s) o.selected = true;
         sel.appendChild(o);
@@ -1564,5 +1568,5 @@
   });
 
   // 화면 검증용 최소 상태(비밀값 없음) — 자동 점검이 앱이 끝까지 실행됐는지 확인합니다.
-  window.__PMR = { version: '20261128r', ready: true, mode: function () { return CURRENT_MODE; } };
+  window.__PMR = { version: '20261128s', ready: true, mode: function () { return CURRENT_MODE; } };
 })();

@@ -1531,6 +1531,16 @@ body[data-mode="ai"] .status-sum[data-status="working"] { color: #60A5FA; }
 body[data-mode="ai"] .status-sum[data-status="exhausted"] { color: #FB923C; }
 body[data-mode="ai"] .status-sum[data-status="offline"] { color: #F87171; }
 
+/* 사단 에이전트 카드 — 이름이 끊기지 않도록 두 줄 배치(이름줄 + 상태줄). */
+body[data-mode="ai"] .attend-item { flex-wrap: wrap; gap: 6px 8px; padding: 8px 10px; }
+body[data-mode="ai"] .attend-pick { flex: 1 1 100%; gap: 9px; }
+body[data-mode="ai"] .attend-right { flex: 1 1 100%; margin-left: 0; }
+body[data-mode="ai"] .attend-actions { width: 100%; gap: 6px; }
+body[data-mode="ai"] .status-select { flex: 1 1 auto; text-align: left; padding: 5px 22px 5px 10px; font-size: 11.5px; }
+body[data-mode="ai"] .attend-name-row { gap: 5px; }
+body[data-mode="ai"] .attend-face { width: 34px; height: 34px; }
+body[data-mode="ai"] .attend-face svg { width: 24px; height: 25px; }
+
 /* 입력 · 필터 */
 body[data-mode="ai"] input[type="text"],
 body[data-mode="ai"] input[type="url"],
