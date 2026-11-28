@@ -201,6 +201,7 @@
     state.pickles.forEach(function (p) {
       var li = el('li', 'attend-item');
       li.dataset.id = p.id;
+      li.dataset.name = p.name;
 
       var face = el('span', 'attend-face');
       face.innerHTML = pickleSvg(colorOf(p), false);
@@ -227,6 +228,7 @@
         react(p.name, STATUS_LABEL[p.status] + ' 상태로 바꿨어요');
         save();
         renderAttendSummary();
+        renderTargets();   // 대상 칩 순서(온라인·작업중 우선)도 다시 맞춥니다
       });
 
       var del = el('button', 'attend-del', '×');
@@ -243,12 +245,25 @@
       wrap.appendChild(del);
       right.appendChild(wrap);
 
-      li.appendChild(face);
-      li.appendChild(meta);
+      // 카드(얼굴 + 이름)를 누르면 그 피클을 채팅 대상으로 지정하고 채팅 탭으로 넘어갑니다.
+      // RTDB에는 새 필드를 만들지 않고, 전송할 때 text 맨 앞에 "@이름 "만 붙입니다.
+      var pick = el('button', 'attend-pick');
+      pick.type = 'button';
+      pick.setAttribute('aria-label', p.name + '에게 지시하기');
+      pick.title = p.name + '에게 지시 — 채팅 대상으로 지정';
+      pick.appendChild(face);
+      pick.appendChild(meta);
+      pick.addEventListener('click', function () {
+        setTarget(p.name);
+        showTab('chat', true);
+      });
+
+      li.appendChild(pick);
       li.appendChild(right);
       attendList.appendChild(li);
     });
     renderAttendSummary();
+    renderTargetState();
   }
 
   function renderAttendSummary() {
@@ -389,6 +404,126 @@
   var chatCount = $('#chatCount');
   var lastChatId = null;
 
+  /* ---------------------- 대상 지정 (@멘션) ---------------------- */
+
+  // RTDB 보안 규칙이 timeline 항목에 { id, who, text, ts, kind }만 허용하므로
+  // 대상 지정은 새 필드를 만들지 않고 text 맨 앞의 "@이름 " 말머리로만 저장합니다.
+  // (그 말머리를 말풍선에서 컬러 배지로 그려 누구에게 보낸 지시인지 보이게 합니다.)
+  var targetName = '';   // '' = 전체
+
+  var pickTargetChips = $('#targetChips');
+
+  // 온라인 → 작업중 → 대기 순으로 정렬해 지금 일하는 피클을 앞에 둡니다.
+  function orderedPickles() {
+    return state.pickles.slice().sort(function (a, b) {
+      return STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+    });
+  }
+
+  function renderTargets() {
+    var wrap = pickTargetChips;
+    if (!wrap) return;
+    if (targetName && !pickleNameById(targetName)) targetName = '';   // 퇴근한 피클이면 전체로
+    wrap.textContent = '';
+
+    var all = el('button', 'target-chip' + (targetName ? '' : ' is-active'), '전체');
+    all.type = 'button';
+    all.dataset.target = '';
+    all.title = '전체 피클에게 보내기';
+    all.setAttribute('aria-pressed', targetName ? 'false' : 'true');
+    wrap.appendChild(all);
+
+    orderedPickles().forEach(function (p) {
+      var on = targetName === p.name;
+      var chip = el('button', 'target-chip' + (on ? ' is-active' : ''));
+      chip.type = 'button';
+      chip.dataset.target = p.name;
+      chip.title = p.name + '에게 지시';
+      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+      var c = colorOf(p);
+      var dot = el('span', 'target-dot');
+      dot.style.background = c.body;
+      dot.style.borderColor = c.ear;
+      chip.appendChild(dot);
+      chip.appendChild(document.createTextNode(p.name));
+      if (p.status === 'working') chip.appendChild(el('span', 'target-work', '작업중'));
+      wrap.appendChild(chip);
+    });
+
+    // 선택된 칩이 스크롤 밖에 있으면 보이게 맞춥니다.
+    var active = wrap.querySelector('.target-chip.is-active');
+    if (active && wrap.scrollWidth > wrap.clientWidth) {
+      var left = active.offsetLeft - wrap.offsetLeft;
+      if (left < wrap.scrollLeft || left + active.offsetWidth > wrap.scrollLeft + wrap.clientWidth) {
+        wrap.scrollLeft = Math.max(0, left - 10);
+      }
+    }
+    renderTargetState();
+  }
+
+  // 입력창 안내문과 접속자 카드 강조를 현재 대상에 맞춥니다.
+  function renderTargetState() {
+    var input = $('#chatText');
+    var form = $('#formChat');
+    if (form) form.classList.toggle('is-targeted', !!targetName);
+    if (input) {
+      input.placeholder = targetName
+        ? targetName + '에게 보낼 메시지 입력...'
+        : '메시지를 입력하고 Enter';
+    }
+    var items = document.querySelectorAll('.attend-item');
+    for (var i = 0; i < items.length; i++) {
+      var on = !!targetName && items[i].dataset.name === targetName;
+      items[i].classList.toggle('is-target', on);
+      var btn = items[i].querySelector('.attend-pick');
+      if (btn) btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  }
+
+  function setTarget(name) {
+    targetName = name && pickleNameById(name) ? name : '';
+    renderTargets();
+  }
+
+  if (pickTargetChips) {
+    pickTargetChips.addEventListener('click', function (e) {
+      var n = e.target;
+      while (n && n !== pickTargetChips && !(n.classList && n.classList.contains('target-chip'))) n = n.parentNode;
+      if (!n || n === pickTargetChips) return;
+      setTarget(n.dataset.target || '');
+      var input = $('#chatText');
+      if (input) input.focus();
+    });
+  }
+
+  // "@이름 …"으로 시작하면 @이름을 컬러 배지로 분리해 그립니다.
+  function fillBubble(bubble, text) {
+    var m = /^@([^\s@]{1,24})(?:\s+|$)/.exec(text);
+    if (!m) { bubble.textContent = text; return; }
+    var name = m[1];
+    var p = pickleNameById(name);
+    var badge = el('span', 'mention-badge', '@' + name);
+    if (p) {
+      var c = colorOf(p);
+      badge.style.background = c.ring;
+      badge.style.borderColor = c.ear;
+    }
+    bubble.appendChild(badge);
+    var rest = text.slice(m[0].length);
+    if (rest) bubble.appendChild(document.createTextNode(rest));
+  }
+
+  // 대상이 정해져 있으면 이미 @이름을 직접 쓴 경우를 빼고 말머리를 붙입니다.
+  function withTarget(text) {
+    if (!targetName) return text;
+    var at = '@' + targetName;
+    if (text.slice(0, at.length) === at) {
+      var next = text.charAt(at.length);
+      if (!next || /\s/.test(next)) return text;
+    }
+    return at + ' ' + text;
+  }
+
   function addLine(who, text, kind) {
     state.timeline.push({
       id: uid('t'),
@@ -462,7 +597,8 @@
       if (!isMe) body.appendChild(el('span', 'msg-name', m.who));
 
       var line = el('div', 'msg-line');
-      var bubble = el('div', 'msg-bubble', m.text);
+      var bubble = el('div', 'msg-bubble');
+      fillBubble(bubble, m.text);
       bubble.title = day + ' ' + fmtTime(m.ts);
       var time = el('span', 'msg-time', fmtTime(m.ts));
       if (mine) {
@@ -533,7 +669,7 @@
     var input = $('#chatText');
     var text = input.value.trim();
     if (!text) { input.focus(); return; }
-    addLine('나', text, 'note');
+    addLine('나', withTarget(text), 'note');
     input.value = '';
     save();
     renderChat();
@@ -554,6 +690,8 @@
   function showTab(tab, focusInput) {
     if (PANEL_TABS.indexOf(tab) < 0) tab = 'chat';
     currentTab = tab;
+    var view = $('#view');
+    if (view) view.classList.toggle('is-attend-tab', tab === 'attend');
     PANEL_TABS.forEach(function (t) {
       var p = panelOf(t);
       if (!p) return;
@@ -981,6 +1119,7 @@
 
   function renderAll() {
     renderAttend();
+    renderTargets();
     renderOwnerSelect();
     renderItems();
     renderChat();
