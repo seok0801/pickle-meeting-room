@@ -432,15 +432,15 @@ body {
 
 .status-select {
   font: inherit;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   border-radius: 999px;
-  padding: 5px 8px 5px 10px;
+  padding: 5px 22px 5px 10px;
   border: 1px solid var(--line-2);
   background-color: #fff;
   color: var(--ink-2);
   cursor: pointer;
-  max-width: 118px;
+  max-width: 128px;
 }
 .status-select[data-status="online"] { background-color: #E9F9EF; border-color: #B7E7C6; color: #15803D; }
 .status-select[data-status="working"] { background-color: #E9F0FF; border-color: #BFD3FF; color: #1D4ED8; }
@@ -1226,7 +1226,7 @@ input:focus, select:focus {
   .attend-pick { gap: 8px; }
   .attend-face { width: 32px; height: 32px; border-radius: 10px; }
   .attend-face svg { width: 23px; height: 24px; }
-  .status-select { max-width: 108px; padding: 4px 6px 4px 8px; font-size: 11.5px; }
+  .status-select { max-width: 120px; padding: 4px 20px 4px 8px; font-size: 11px; }
 
   .chat-feed { padding: 14px 12px; }
 }
