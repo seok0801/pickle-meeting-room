@@ -937,6 +937,58 @@
     lastChatId = last;
   }
 
+  /* ------------------------------ 채팅 입력창 (여러 줄) ------------------------------ */
+
+  // 한 줄 높이에서 시작해 입력한 줄 수만큼 늘어나고(최대 5줄), 그보다 길면 입력창 안에서 스크롤됩니다.
+  var CHAT_MAX_H = 112;
+  function autoResize() {
+    var input = $('#chatText');
+    if (!input || input.tagName !== 'TEXTAREA') return;
+    input.style.height = 'auto';
+    // 테두리 두께는 scrollHeight에 들어 있지 않아 따로 더해 줍니다(border-box).
+    var border = Math.max(0, input.offsetHeight - input.clientHeight);
+    var h = input.scrollHeight + border;
+    // 화면이 숨겨져 있으면 높이를 재지 못합니다 — 그때는 CSS 기본(한 줄) 높이로 둡니다.
+    if (input.scrollHeight <= 0) { input.style.height = ''; input.style.overflowY = 'hidden'; return; }
+    input.style.height = Math.min(h, CHAT_MAX_H) + 'px';
+    input.style.overflowY = h > CHAT_MAX_H + 1 ? 'auto' : 'hidden';
+  }
+
+  // 전송 후에는 다시 한 줄 높이로 되돌립니다.
+  function resetComposerHeight() {
+    var input = $('#chatText');
+    if (!input || input.tagName !== 'TEXTAREA') return;
+    input.style.height = 'auto';
+    input.style.overflowY = 'hidden';
+    autoResize();
+  }
+
+  var composerWired = false;
+  function wireComposer() {
+    var input = $('#chatText');
+    if (!input || composerWired) return;
+    composerWired = true;
+    var composing = false;
+    var composedAt = 0;
+    input.addEventListener('input', autoResize);
+    input.addEventListener('compositionstart', function () { composing = true; });
+    input.addEventListener('compositionend', function () { composing = false; composedAt = Date.now(); });
+    // Enter는 전송, Shift+Enter는 줄바꿈.
+    // 한글 입력기(IME)가 조합을 마무리하는 Enter(조합 중 · keyCode 229)로는 절대 전송하지 않습니다.
+    input.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' || e.shiftKey) return;
+      if (e.isComposing || e.keyCode === 229 || composing || Date.now() - composedAt < 40) return;
+      e.preventDefault();
+      if (!input.value.trim()) return;
+      var form = $('#formChat');
+      if (!form) return;
+      if (typeof form.requestSubmit === 'function') form.requestSubmit();
+      else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    });
+    autoResize();
+  }
+  wireComposer();
+
   $('#formChat').addEventListener('submit', function (e) {
     e.preventDefault();
     var input = $('#chatText');
@@ -944,8 +996,10 @@
     if (!text) { input.focus(); return; }
     addLine('나', withTarget(text), 'note');
     input.value = '';
+    resetComposerHeight();
     save();
     renderChat();
+    if (chatFeed) chatFeed.scrollTop = chatFeed.scrollHeight;
     input.focus();
   });
 
@@ -979,6 +1033,7 @@
     });
     if (tab === 'chat') {
       renderChat();
+      autoResize();
       requestAnimationFrame(function () { chatFeed.scrollTop = chatFeed.scrollHeight; });
       if (focusInput) {
         var box = $('#chatText');
@@ -1912,13 +1967,63 @@
     if (s) { state = s; renderAll(); }
   });
 
+  /* ------------------------------ 모바일 키보드 · 보이는 화면 높이 ------------------------------ */
+
+  // iOS Safari·홈화면 PWA는 키보드가 올라와도 100dvh가 줄지 않아 하단 입력창이 키보드 뒤로 숨습니다.
+  // 보이는 높이(visualViewport)에 맞춰 앱 높이를 줄이고, 문서가 밀린 만큼 앱을 내려 입력창을 키보드 위에 둡니다.
+  (function syncViewport() {
+    var vv = window.visualViewport;
+    var root = document.documentElement;
+    function apply() {
+      var inner = window.innerHeight || 0;
+      var h = inner;
+      var top = 0;
+      if (vv) {
+        h = Math.min(vv.height, inner);
+        top = Math.max(0, Math.round(vv.offsetTop || 0));
+      }
+      if (h > 0) {
+        root.style.setProperty('--app-vh', Math.round(h) + 'px');
+        root.style.setProperty('--app-top', top + 'px');
+      }
+      var kb = !!(vv && inner - vv.height > 120);
+      root.classList.toggle('is-kb', kb);
+      if (kb) {
+        autoResize();
+        var input = $('#chatText');
+        if (chatFeed && input && document.activeElement === input) chatFeed.scrollTop = chatFeed.scrollHeight;
+      }
+    }
+    apply();
+    window.addEventListener('resize', apply);
+    window.addEventListener('orientationchange', function () { setTimeout(apply, 250); });
+    if (vv) {
+      vv.addEventListener('resize', apply);
+      vv.addEventListener('scroll', apply);
+    }
+  })();
+
   // 화면 검증용 최소 상태(비밀값 없음) — 자동 점검이 앱이 끝까지 실행됐는지 확인합니다.
   window.__PMR = {
-    version: '20261128z2',
+    version: '20261128z3',
     ready: true,
     mode: function () { return CURRENT_MODE; },
     tab: function () { return currentTab; },
     summaryVisible: function () { var s = $('#aiSummary'); return !!(s && !s.hidden); },
+    // 채팅 입력창 상태(값은 담지 않습니다) — 태그·글자 수 상한·현재 높이·스크롤 여부
+    composer: function () {
+      var i = $('#chatText');
+      if (!i) return null;
+      return {
+        tag: i.tagName.toLowerCase(),
+        maxlength: i.maxLength,
+        rows: i.rows,
+        height: Math.round(i.getBoundingClientRect().height),
+        scrollHeight: i.scrollHeight,
+        overflowY: window.getComputedStyle(i).overflowY,
+        focused: document.activeElement === i
+      };
+    },
     refresh: refreshNow,
     lastRefreshAt: function () { return lastRefreshAt; },
     ptr: function () {
