@@ -427,7 +427,7 @@ body {
   white-space: nowrap;
 }
 
-.attend-right { margin-left: auto; flex: 0 0 auto; }
+.attend-right { margin-left: auto; flex: 0 1 auto; min-width: 0; }
 .attend-actions { display: flex; align-items: center; gap: 2px; }
 
 .status-select {
@@ -440,7 +440,7 @@ body {
   background-color: #fff;
   color: var(--ink-2);
   cursor: pointer;
-  max-width: 128px;
+  max-width: 100%;
 }
 .status-select[data-status="online"] { background-color: #E9F9EF; border-color: #B7E7C6; color: #15803D; }
 .status-select[data-status="working"] { background-color: #E9F0FF; border-color: #BFD3FF; color: #1D4ED8; }
@@ -1226,7 +1226,7 @@ input:focus, select:focus {
   .attend-pick { gap: 8px; }
   .attend-face { width: 32px; height: 32px; border-radius: 10px; }
   .attend-face svg { width: 23px; height: 24px; }
-  .status-select { max-width: 120px; padding: 4px 20px 4px 8px; font-size: 11px; }
+  .status-select { max-width: 100%; padding: 4px 20px 4px 8px; font-size: 11px; }
 
   .chat-feed { padding: 14px 12px; }
 }
