@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>관제실 키보드 레이아웃 점검 (임시)</title>
+<style>
+  html, body { margin: 0; background: #F6F4EC; color: #241F12; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; }
+  #stage { width: 390px; margin: 0 auto; }
+  #stage .lbl { font-weight: 700; padding: 6px 2px 4px; font-size: 12px; }
+  #frame { display: block; width: 390px; height: 844px; border: 0; background: #fff; }
+  #out { position: absolute; left: -9999px; top: 0; width: 700px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="lbl" id="lbl">준비 중…</div>
+  <iframe id="frame" src="index.html?kbtest=1" title="관제실 390x844 점검"></iframe>
+</div>
+<pre id="out">running…</pre>
+<script>
+/* 임시 점검 페이지 — 배포본 index.html 을 390x844 iframe 으로 띄워
+   iOS 키보드 상황(innerHeight·visualViewport 목킹)별 레이아웃을 실측합니다.
+   초대 키·비밀값은 쓰지 않습니다. 점검이 끝나면 이 파일은 저장소에서 제거합니다. */
+(function () {
+  var frame = document.getElementById('frame');
+  var out = document.getElementById('out');
+  var lbl = document.getElementById('lbl');
+  var CASE = (new RegExp('[?&]case=([\\w-]+)').exec(location.search) || [])[1] || 'all';
+  var results = {};
+
+  function mock(w) {
+    var m = { inner: 844, vv: 844, top: 0 };
+    var fake = {
+      get height() { return m.vv; },
+      get offsetTop() { return m.top; },
+      get width() { return 390; },
+      get scale() { return 1; },
+      addEventListener: function () {}, removeEventListener: function () {}
+    };
+    Object.defineProperty(w, 'innerHeight', { configurable: true, get: function () { return m.inner; } });
+    Object.defineProperty(w, 'visualViewport', { configurable: true, get: function () { return fake; } });
+    w.__kbm = function (inner, vv, focused) {
+      m.inner = inner; m.vv = vv;
+      var i = w.document.getElementById('chatText');
+      if (focused && i) i.focus();
+      if (!focused && w.document.activeElement && w.document.activeElement.blur) w.document.activeElement.blur();
+      w.dispatchEvent(new w.Event('resize'));
+      if (w.visualViewport && typeof w.visualViewport.dispatchEvent === 'function') w.visualViewport.dispatchEvent(new w.Event('resize'));
+    };
+  }
+
+  function showApp(w) {
+    w.document.getElementById('lockScreen').hidden = true;
+    w.document.body.classList.remove('is-locked');
+    w.document.getElementById('appRoot').hidden = false;
+    w.dispatchEvent(new w.Event('resize'));
+  }
+
+  function read(w) {
+    var d = w.document;
+    var app = d.getElementById('appRoot');
+    var form = d.getElementById('formChat');
+    var dock = d.querySelector('.dock');
+    var cs = w.getComputedStyle(app);
+    return {
+      kb: d.documentElement.classList.contains('is-kb'),
+      padBottom: Math.round(parseFloat(cs.paddingBottom) || 0),
+      appTop: Math.round(app.getBoundingClientRect().top),
+      appHeight: Math.round(app.getBoundingClientRect().height),
+      appBottom: Math.round(app.getBoundingClientRect().bottom),
+      composerBottom: form ? Math.round(form.getBoundingClientRect().bottom) : null,
+      dockDisplay: dock ? w.getComputedStyle(dock).display : null,
+      scrollWidth: d.documentElement.scrollWidth,
+      clientWidth: d.documentElement.clientWidth,
+      innerHeight: w.innerHeight,
+      vvHeight: Math.round(w.visualViewport.height),
+      jsErrors: d.documentElement.dataset.jsErrors || '',
+      version: w.__PMR ? w.__PMR.version : null
+    };
+  }
+
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function setState(w, input, vv, focused, name, keyboard) {
+    var d = w.document;
+    var old = d.getElementById('__kbmock');
+    if (old) old.remove();
+    w.__kbm(input, vv, focused);
+    if (keyboard && vv < 700) {
+      var k = d.createElement('div');
+      k.id = '__kbmock';
+      k.style.cssText = 'position:fixed;left:0;right:0;bottom:0;height:' + (844 - vv) + 'px;background:#2B2B2F;z-index:99999;' +
+        'color:#F2F2F2;font:600 13px/1 -apple-system,sans-serif;display:flex;align-items:flex-start;justify-content:center;padding-top:14px';
+      k.textContent = '⌨️ 키보드 영역 (시뮬레이션, ' + vv + '~844px)';
+      d.body.appendChild(k);
+    }
+  }
+
+  frame.addEventListener('load', async function () {
+    var w = frame.contentWindow;
+    lbl.textContent = '준비 중…';
+    try {
+      if (!w.__PMR) { out.textContent = 'NO_APP'; return; }
+      mock(w);
+      showApp(w);
+      await wait(350);
+
+      results.load = read(w);
+      results.load.versionAtLoad = w.__PMR.version;
+
+      // 1) 일반 상태 (390x844, 키보드 없음)
+      setState(w, 844, 844, false, 'normal', false);
+      await wait(450);
+      results.normal = read(w);
+      if (CASE === 'normal') lbl.textContent = '1) 일반 상태 — 독 노출 · 하단 여백 84px';
+
+      // 2) iOS 홈화면 PWA 키보드 — innerHeight 와 visualViewport.height 가 함께 480
+      setState(w, 480, 480, true, 'kb_pwa', CASE === 'kb_pwa');
+      await wait(700);
+      results.kb_pwa = read(w);
+      if (CASE === 'kb_pwa') lbl.textContent = '2) 키보드 · iOS PWA 재현 (innerHeight=480) — 입력창이 480px 바닥에 붙어야 함';
+
+      // 3) iOS Safari 키보드 — innerHeight 는 844 그대로, visualViewport 만 480
+      setState(w, 844, 480, true, 'kb_safari', CASE === 'kb_safari');
+      await wait(700);
+      results.kb_safari = read(w);
+      if (CASE === 'kb_safari') lbl.textContent = '3) 키보드 · iOS Safari 재현 (vv=480)';
+
+      // 4) 키보드 닫힘 — 복귀
+      setState(w, 844, 844, false, 'closed', false);
+      await wait(700);
+      results.closed = read(w);
+
+      // 5) 가로 회전(390x390) — 키보드 아님으로 판정
+      setState(w, 390, 390, false, 'landscape', false);
+      await wait(700);
+      results.landscape = read(w);
+
+      // 화면 캡처용으로 요청한 상태를 마지막에 다시 세팅
+      if (CASE === 'normal') setState(w, 844, 844, false, 'normal', false);
+      else if (CASE === 'kb_pwa') setState(w, 480, 480, true, 'kb_pwa', true);
+      else if (CASE === 'kb_safari') setState(w, 844, 480, true, 'kb_safari', true);
+      else if (CASE === 'landscape') setState(w, 390, 390, false, 'landscape', true);
+      await wait(600);
+
+      out.textContent = JSON.stringify(results, null, 2);
+      window.__KBRESULT = results;
+      if (CASE === 'all') lbl.textContent = '점검 완료 — __KBRESULT';
+    } catch (e) {
+      out.textContent = 'ERR ' + (e && e.message ? e.message : e);
+      window.__KBRESULT = { error: String(e && e.message ? e.message : e) };
+    }
+  });
+})();
+</script>
+</body>
+</html>
