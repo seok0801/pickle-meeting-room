@@ -985,6 +985,16 @@
         if (box) box.focus();
       }
     }
+    updateSummaryVisibility();
+  }
+
+  // 사단 현황 바 — 관제실 모드의 '사단' 탭에서만 자리를 차지합니다.
+  // (오더·일감·설정 탭에서는 display:none 상태로 완전히 숨겨 채팅 면을 가리지 않습니다.)
+  function updateSummaryVisibility() {
+    var s = $('#aiSummary');
+    if (!s) return;
+    var tab = typeof currentTab === 'string' ? currentTab : 'chat';
+    s.hidden = !(isAi() && tab === 'attend');
   }
 
   dockButtons.forEach(function (b) {
@@ -1003,6 +1013,156 @@
       catch (e) { node.scrollIntoView(); }
     });
   });
+
+  /* ------------------------------ 새로고침 (당겨서 · ↻ 버튼) ------------------------------ */
+
+  // 스크롤이 맨 위일 때 아래로 당기면 "당겨서 새로고침" → "놓으면 새로고침" → 최신 데이터 다시 읽기.
+  // 일반 스크롤·입력창 터치는 건드리지 않습니다(스크롤이 내려가 있거나 가로로 움직이면 그냥 통과).
+  var ptrEl = $('#ptrIndicator');
+  var ptrText = $('#ptrText');
+  var PTR_TRIGGER = 62;   // 이만큼 당기면 손을 뗄 때 새로고침
+  var PTR_MAX = 104;
+  var lastRefreshAt = 0;
+  var ptrState = { armed: false, locked: false, startY: 0, startX: 0, pull: 0, scroller: null, busy: false };
+  var refreshHideTimer = null;
+
+  function activePanel() {
+    return document.querySelector('.view > .panel.is-active');
+  }
+
+  // 터치한 곳에서 가장 가까운 '지금 스크롤되는' 영역 — 없으면 지금 탭 패널.
+  function scrollableAncestor(node) {
+    while (node && node !== document.body && node !== document.documentElement) {
+      if (node.nodeType === 1) {
+        var oy = window.getComputedStyle(node).overflowY;
+        if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight + 2) return node;
+      }
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  function mayPullFrom(target) {
+    if (!target || !target.nodeType) return false;
+    var tag = (target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'option') return false;
+    if (target.isContentEditable) return false;
+    if (document.querySelector('dialog[open]')) return false;
+    return true;
+  }
+
+  function ptrPaint(px, dragging) {
+    if (!ptrEl) return;
+    ptrEl.classList.toggle('is-dragging', !!dragging);
+    ptrEl.style.transform = 'translateY(calc(-100% + ' + Math.round(px) + 'px))';
+    ptrEl.style.opacity = px > 2 ? '1' : '0';
+  }
+
+  function ptrLabel(state, text) {
+    if (ptrEl) ptrEl.dataset.state = state;
+    if (ptrText) ptrText.textContent = text;
+  }
+
+  // 짧은 안내 문구(가져오기 결과 등)도 같은 말포 풍선을 빌려 씁니다.
+  function setSyncStatus(text, kind) {
+    if (!ptrEl) return;
+    if (refreshHideTimer) { clearTimeout(refreshHideTimer); refreshHideTimer = null; }
+    ptrLabel(kind === 'error' ? 'error' : 'done', text || '');
+    ptrPaint(64, false);
+    refreshHideTimer = setTimeout(function () { ptrPaint(0, false); ptrLabel('idle', '당겨서 새로고침'); }, 1800);
+  }
+
+  // 실제 새로고침 — 대기 중인 저장을 먼저 보낸 뒤 RTDB에서 최신 상태를 다시 읽습니다.
+  function refreshNow() {
+    if (ptrState.busy) return Promise.resolve(false);
+    ptrState.busy = true;
+    var btn = $('#btnRefresh');
+    if (btn) btn.classList.add('is-spinning');
+    if (refreshHideTimer) { clearTimeout(refreshHideTimer); refreshHideTimer = null; }
+    ptrLabel('loading', '새로고침 중…');
+    ptrPaint(64, false);
+    var started = Date.now();
+
+    function finish(ok) {
+      var wait = Math.max(0, 380 - (Date.now() - started));
+      setTimeout(function () {
+        ptrState.busy = false;
+        if (btn) btn.classList.remove('is-spinning');
+        if (ok) lastRefreshAt = Date.now();
+        ptrLabel(ok ? 'done' : 'error', ok ? '새로고침 완료' : '새로고침 실패 · 화면만 갱신');
+        ptrPaint(64, false);
+        refreshHideTimer = setTimeout(function () {
+          ptrPaint(0, false);
+          ptrLabel('idle', '당겨서 새로고침');
+        }, 950);
+      }, wait);
+      return ok;
+    }
+
+    return Sync.pull().then(function (ok) {
+      renderAll();
+      return finish(!!ok);
+    }).catch(function () {
+      renderAll();
+      return finish(false);
+    });
+  }
+
+  function onPtrStart(e) {
+    if (!ENTERED || ptrState.busy || e.touches.length !== 1) return;
+    ptrState.armed = false;
+    ptrState.locked = false;
+    ptrState.pull = 0;
+    if (!mayPullFrom(e.target)) return;
+    var sc = scrollableAncestor(e.target);
+    if (sc && sc.scrollTop > 0) { ptrState.scroller = null; return; }
+    ptrState.scroller = sc;
+    ptrState.startY = e.touches[0].clientY;
+    ptrState.startX = e.touches[0].clientX;
+    ptrState.armed = true;
+  }
+
+  function onPtrMove(e) {
+    if (!ptrState.armed || ptrState.busy || e.touches.length !== 1) return;
+    var t = e.touches[0];
+    var dy = t.clientY - ptrState.startY;
+    var dx = t.clientX - ptrState.startX;
+    if (!ptrState.locked) {
+      if (dy <= 0) { if (dy < -4) ptrState.armed = false; return; }
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) { ptrState.armed = false; return; }
+      if (ptrState.scroller && ptrState.scroller.scrollTop > 0) { ptrState.armed = false; return; }
+      if (dy < 8) return;
+      ptrState.locked = true;
+    }
+    var pull = Math.min(PTR_MAX, dy * 0.52);
+    ptrState.pull = pull;
+    if (e.cancelable) e.preventDefault();
+    ptrLabel(pull >= PTR_TRIGGER ? 'ready' : 'pull', pull >= PTR_TRIGGER ? '놓으면 새로고침' : '당겨서 새로고침');
+    ptrPaint(pull, true);
+  }
+
+  function onPtrEnd() {
+    if (!ptrState.armed) return;
+    var pull = ptrState.pull;
+    var fired = ptrState.locked && pull >= PTR_TRIGGER;
+    ptrState.armed = false;
+    ptrState.locked = false;
+    ptrState.pull = 0;
+    if (fired) {
+      refreshNow();
+    } else if (ptrEl) {
+      ptrLabel('idle', '당겨서 새로고침');
+      ptrPaint(0, false);
+    }
+  }
+
+  document.addEventListener('touchstart', onPtrStart, { passive: true });
+  document.addEventListener('touchmove', onPtrMove, { passive: false });
+  document.addEventListener('touchend', onPtrEnd, { passive: true });
+  document.addEventListener('touchcancel', onPtrEnd, { passive: true });
+
+  var btnRefresh = $('#btnRefresh');
+  if (btnRefresh) btnRefresh.addEventListener('click', function () { refreshNow(); });
 
   // 독 배지 — 안건: 미완료 개수, 참가자: 출석 인원
   function renderDockBadges() {
@@ -1250,21 +1410,56 @@
       }, 5000);
     }
 
+    function send() {
+      if (!cfg.url || !cfg.room || !cfg.key) return Promise.resolve(false);
+      return fetch(endpoint(), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state)
+      }).then(function (r) {
+        if (!r.ok) chip('error', '저장 실패 (' + r.status + ')');
+        return !!r.ok;
+      }).catch(function () {
+        chip('error', '저장 실패');
+        return false;
+      });
+    }
+
     function push(force) {
       if (!cfg.url || !cfg.room || !cfg.key) return;
       if (!force && Date.now() < suppressUntil) return;
       if (pushTimer) clearTimeout(pushTimer);
       pushTimer = setTimeout(function () {
-        fetch(endpoint(), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(state)
-        }).then(function (r) {
-          if (!r.ok) chip('error', '저장 실패 (' + r.status + ')');
-        }).catch(function () {
-          chip('error', '저장 실패');
-        });
+        pushTimer = null;
+        send();
       }, 350);
+    }
+
+    // 새로고침 — 밀린 저장을 먼저 올리고, RTDB에서 최신 상태를 강제로 다시 읽습니다.
+    function pull() {
+      if (!cfg.url || !cfg.room || !cfg.key) return Promise.resolve(false);
+      var pre = Promise.resolve(true);
+      if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; pre = send(); }
+      return pre.then(function () {
+        return fetch(endpoint(), { cache: 'no-store' });
+      }).then(function (r) {
+        if (!r.ok) {
+          chip('error', '새로고침 실패 (' + r.status + ')');
+          return false;
+        }
+        return r.json().then(function (data) {
+          if (data) {
+            applyRemote(data, true);
+            chip('online', '동기화 중', ctrl && !ctrl.signal.aborted ? 'sse' : 'poll');
+          } else {
+            push(true);
+          }
+          return true;
+        });
+      }).catch(function () {
+        chip('error', '새로고침 실패');
+        return false;
+      });
     }
 
     return {
@@ -1283,7 +1478,8 @@
           onResult(err && err.code ? err.code : 0);
         });
       },
-      push: push
+      push: push,
+      pull: pull
     };
   })();
 
@@ -1502,7 +1698,7 @@
       empty: '아직 메시지가 없어요. 첫 메시지를 보내 보세요.'
     },
     ai: {
-      brand: '🧭 AI 사단 통합 관제실', brandSub: 'AI COMMAND CENTER',
+      brand: 'AI 사단 관제실', brandSub: 'AI COMMAND CENTER',
       title: '🧭 AI 사단 통합 관제실 · AI COMMAND CENTER', themeColor: '#0B1220',
       chat: '실시간 오더 · 보고', agenda: '일감 큐',
       attend: '사단 에이전트 상태판', settings: '관제실 설정',
@@ -1556,7 +1752,8 @@
     });
 
     var summary = $('#aiSummary');
-    if (summary) summary.hidden = CURRENT_MODE !== 'ai';
+    if (summary) summary.hidden = true;   // 탭에 맞춰 바로 아래에서 다시 계산합니다.
+    updateSummaryVisibility();
     var ms = $('#modeState');
     if (ms) ms.dataset.state = CURRENT_MODE;
     var mst = $('#modeStateText');
@@ -1654,6 +1851,7 @@
     renderItems();
     renderChat();
     renderAiSummary();
+    updateSummaryVisibility();
   }
 
   renderAll();
@@ -1675,5 +1873,21 @@
   });
 
   // 화면 검증용 최소 상태(비밀값 없음) — 자동 점검이 앱이 끝까지 실행됐는지 확인합니다.
-  window.__PMR = { version: '20261128x', ready: true, mode: function () { return CURRENT_MODE; } };
+  window.__PMR = {
+    version: '20261128y',
+    ready: true,
+    mode: function () { return CURRENT_MODE; },
+    tab: function () { return currentTab; },
+    summaryVisible: function () { var s = $('#aiSummary'); return !!(s && !s.hidden); },
+    refresh: refreshNow,
+    lastRefreshAt: function () { return lastRefreshAt; },
+    ptr: function () {
+      return {
+        state: ptrEl ? ptrEl.dataset.state : null,
+        text: ptrText ? ptrText.textContent : '',
+        pull: ptrState.pull,
+        busy: ptrState.busy
+      };
+    }
+  };
 })();

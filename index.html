@@ -2,12 +2,12 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>피클 합동 회의실 · Pickle Meeting Room</title>
 <meta name="description" content="귀여운 피클들이 함께 모여 회의하는 합동 회의실. 출석 보드, 회의 안건·할 일, 실시간 말풍선 채팅방. AI 사단 통합 관제실 모드 포함.">
 <meta name="theme-color" content="#FFD84D">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css?v=20261128x">
+<link rel="stylesheet" href="styles.css?v=20261128y">
 <script>
 /* 화면 검증용 최소 오류 기록 — 오류 메시지만 html[data-js-errors]에 모읍니다(데이터·비밀값 없음). */
 (function () {
@@ -48,6 +48,14 @@
 
 <div class="app" id="appRoot" hidden>
 
+  <!-- 당겨서 새로고침 인디케이터 (손가락을 따라 내려옵니다) -->
+  <div class="ptr" id="ptrIndicator" data-state="idle" aria-hidden="true">
+    <span class="ptr-pill">
+      <svg class="ptr-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 12a8.2 8.2 0 1 1-2.7-6.1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M20.2 4.4v4.6h-4.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span id="ptrText">당겨서 새로고침</span>
+    </span>
+  </div>
+
   <header class="topbar">
     <div class="brand">
       <span class="brand-badge" aria-hidden="true">
@@ -60,46 +68,27 @@
       </span>
     </div>
 
-    <span class="sync-chip" id="syncChip" data-state="local" title="실시간 동기화 상태">
-      <span class="dot" aria-hidden="true"></span><span id="syncChipText">연결 중</span>
-    </span>
+    <div class="topbar-actions">
+      <!-- 모드 바: 가족 회의실 ↔ 🧭 AI 사단 관제실 -->
+      <div class="mode-bar" id="modeBar" role="group" aria-label="회의실 모드 전환">
+        <button type="button" class="mode-btn" data-mode="family" aria-pressed="true" title="가족 회의실로 전환">
+          <span class="mode-emoji" aria-hidden="true">🏠</span><span>가족</span>
+        </button>
+        <button type="button" class="mode-btn" data-mode="ai" aria-pressed="false" title="AI 사단 통합 관제실로 전환">
+          <span class="mode-emoji" aria-hidden="true">🧭</span><span>관제실</span>
+        </button>
+      </div>
+
+      <!-- 수동 새로고침 — 홈 화면 앱에서도 한 번 눌러 최신 데이터를 다시 불러옵니다 -->
+      <button type="button" class="icon-btn refresh-btn" id="btnRefresh" aria-label="새로고침" title="새로고침 (최신 데이터 다시 불러오기)">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.2 12a8.2 8.2 0 1 1-2.7-6.1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M20.2 4.4v4.6h-4.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <span class="sync-chip" id="syncChip" data-state="local" title="실시간 동기화 상태">
+        <span class="dot" aria-hidden="true"></span><span id="syncChipText">연결 중</span>
+      </span>
+    </div>
   </header>
-
-  <!-- ============ 모드 바: 가족 회의실 ↔ 🧭 AI 사단 관제실 ============ -->
-  <div class="mode-bar" id="modeBar" role="group" aria-label="회의실 모드 전환">
-    <button type="button" class="mode-btn" data-mode="family" aria-pressed="true" title="가족 회의실로 전환">
-      <span class="mode-emoji" aria-hidden="true">🏠</span><span>가족 회의실</span>
-    </button>
-    <button type="button" class="mode-btn" data-mode="ai" aria-pressed="false" title="AI 사단 통합 관제실로 전환">
-      <span class="mode-emoji" aria-hidden="true">🧭</span><span>관제실</span>
-    </button>
-  </div>
-
-  <!-- ============ AI 관제실 요약 (관제실 모드에서만) ============ -->
-  <div class="ai-summary" id="aiSummary" hidden aria-label="사단 현황 요약">
-    <div class="ai-sum-head">
-      <span class="ai-sum-title">사단 현황</span>
-      <span class="ai-sse" id="aiSse" data-state="local" title="실시간 스트림 상태">
-        <span class="dot" aria-hidden="true"></span><span id="aiSseText">SSE 연결 중</span>
-      </span>
-    </div>
-    <div class="ai-sum-grid">
-      <button type="button" class="ai-stat" data-stat="online" data-go="attend" title="접속 중인 에이전트 — 사단 상태판 열기"><b id="statOnline">0</b><span>접속</span></button>
-      <button type="button" class="ai-stat" data-stat="working" data-go="attend" title="작업 중인 에이전트 — 사단 상태판 열기"><b id="statWorking">0</b><span>작업중</span></button>
-      <button type="button" class="ai-stat" data-stat="exhausted" data-go="attend" title="한도 소진 에이전트 — 사단 상태판 열기"><b id="statExhausted">0</b><span>한도소진</span></button>
-      <button type="button" class="ai-stat" data-stat="offline" data-go="attend" title="중단(접속 끊김) 에이전트 — 사단 상태판 열기"><b id="statOffline">0</b><span>중단</span></button>
-      <button type="button" class="ai-stat" data-stat="open" data-go="agenda" title="미완료 일감 — 일감 큐 열기"><b id="statOpen">0</b><span>미완료 일감</span></button>
-    </div>
-
-    <!-- 부대장 승계 배너 — 주봇이 한도 소진/중단이면 코덱스PC2가 임시 대장을 맡습니다 -->
-    <div class="deputy-banner" id="deputyBanner" role="status" aria-live="polite" hidden>
-      <span class="deputy-ic" aria-hidden="true">⚠️</span>
-      <span class="deputy-body">
-        <strong id="deputyBannerTitle">주봇 한도 소진 — 부대장 승계 가동 중 (임시 대장: 코덱스PC2)</strong>
-        <span class="deputy-sub">결제·개인정보·대외 발신·삭제·예약 변경은 대장님 승인 대기</span>
-      </span>
-    </div>
-  </div>
 
   <main class="view" id="view">
 
@@ -166,6 +155,32 @@
       <div class="panel-head">
         <h2 id="attendTitle">접속자 · 출석 피클</h2>
         <p class="panel-sub"><span id="attendCount">0</span><span id="attendStatus"></span></p>
+      </div>
+
+      <!-- 사단 현황 — 관제실 + 사단 탭에서만 보입니다(오더·일감·설정 탭에서는 숨김) -->
+      <div class="ai-summary" id="aiSummary" hidden aria-label="사단 현황 요약">
+        <div class="ai-sum-head">
+          <span class="ai-sum-title">사단 현황</span>
+          <span class="ai-sse" id="aiSse" data-state="local" title="실시간 스트림 상태">
+            <span class="dot" aria-hidden="true"></span><span id="aiSseText">SSE 연결 중</span>
+          </span>
+        </div>
+        <div class="ai-sum-grid">
+          <button type="button" class="ai-stat" data-stat="online" data-go="attend" title="접속 중인 에이전트 — 사단 상태판 열기"><b id="statOnline">0</b><span>접속</span></button>
+          <button type="button" class="ai-stat" data-stat="working" data-go="attend" title="작업 중인 에이전트 — 사단 상태판 열기"><b id="statWorking">0</b><span>작업중</span></button>
+          <button type="button" class="ai-stat" data-stat="exhausted" data-go="attend" title="한도 소진 에이전트 — 사단 상태판 열기"><b id="statExhausted">0</b><span>한도소진</span></button>
+          <button type="button" class="ai-stat" data-stat="offline" data-go="attend" title="중단(접속 끊김) 에이전트 — 사단 상태판 열기"><b id="statOffline">0</b><span>중단</span></button>
+          <button type="button" class="ai-stat" data-stat="open" data-go="agenda" title="미완료 일감 — 일감 큐 열기"><b id="statOpen">0</b><span>미완료 일감</span></button>
+        </div>
+
+        <!-- 부대장 승계 배너 — 주봇이 한도 소진/중단이면 코덱스PC2가 임시 대장을 맡습니다 -->
+        <div class="deputy-banner" id="deputyBanner" role="status" aria-live="polite" hidden>
+          <span class="deputy-ic" aria-hidden="true">⚠️</span>
+          <span class="deputy-body">
+            <strong id="deputyBannerTitle">주봇 한도 소진 — 부대장 승계 가동 중 (임시 대장: 코덱스PC2)</strong>
+            <span class="deputy-sub">결제·개인정보·대외 발신·삭제·예약 변경은 대장님 승인 대기</span>
+          </span>
+        </div>
       </div>
 
       <p class="attend-hint" id="attendHint">카드를 누르면 그 피클이 채팅 대상으로 지정됩니다.</p>
@@ -287,6 +302,6 @@
   </form>
 </dialog>
 
-<script src="app.js?v=20261128x"></script>
+<script src="app.js?v=20261128y"></script>
 </body>
 </html>
