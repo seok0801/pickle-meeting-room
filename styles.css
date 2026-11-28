@@ -1541,6 +1541,21 @@ body[data-mode="ai"] .attend-name-row { gap: 5px; }
 body[data-mode="ai"] .attend-face { width: 34px; height: 34px; }
 body[data-mode="ai"] .attend-face svg { width: 24px; height: 25px; }
 
+/* 스크롤바도 다크 톤으로 */
+body[data-mode="ai"] .chat-feed,
+body[data-mode="ai"] .item-list,
+body[data-mode="ai"] .attend-list,
+body[data-mode="ai"] .panel-settings { scrollbar-color: #2C3E5C transparent; scrollbar-width: thin; }
+body[data-mode="ai"] .chat-feed::-webkit-scrollbar,
+body[data-mode="ai"] .item-list::-webkit-scrollbar,
+body[data-mode="ai"] .attend-list::-webkit-scrollbar { width: 8px; height: 8px; }
+body[data-mode="ai"] .chat-feed::-webkit-scrollbar-thumb,
+body[data-mode="ai"] .item-list::-webkit-scrollbar-thumb,
+body[data-mode="ai"] .attend-list::-webkit-scrollbar-thumb { background: #2C3E5C; border-radius: 999px; }
+body[data-mode="ai"] .chat-feed::-webkit-scrollbar-track,
+body[data-mode="ai"] .item-list::-webkit-scrollbar-track,
+body[data-mode="ai"] .attend-list::-webkit-scrollbar-track { background: transparent; }
+
 /* 입력 · 필터 */
 body[data-mode="ai"] input[type="text"],
 body[data-mode="ai"] input[type="url"],
