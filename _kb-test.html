@@ -152,12 +152,22 @@
     results.landscape = d.reads[0];
     if (CASE !== 'landscape') closeFrame(d.frame);
 
-    if (CASE === 'kb_pwa') setState(b.w, 480, 480, true, true);
-    await wait(500);
+    // 캡처용 — 요청한 상태를 마지막에 새 프레임으로 다시 띄워 그대로 둡니다.
+    var finalSteps = {
+      normal: [[844, 844, false, false, 700, true]],
+      kb_pwa: [[480, 480, true, true, 800, true]],
+      kb_safari: [[844, 480, true, true, 800, true]],
+      landscape: [[390, 390, false, false, 700, true]]
+    }[CASE];
+    if (finalSteps) {
+      var fin = await runCase(CASE, finalSteps, true);
+      results['final_' + CASE] = fin.reads[0];
+      lbl.textContent = '화면 캡처: ' + CASE;
+    }
 
     out.textContent = JSON.stringify(results, null, 2);
     window.__KBRESULT = results;
-    lbl.textContent = CASE === 'all' ? '점검 완료 — __KBRESULT' : (lbl.textContent || '점검 완료');
+    if (CASE === 'all') lbl.textContent = '점검 완료 — __KBRESULT';
     window.__KBREADY = true;
   }
 
