@@ -1787,6 +1787,16 @@ body[data-mode="ai"] .dialog-status { color: #8C9DB6; }
   margin: 0 0 2px;
 }
 
+/* 빈 채팅 안내는 hidden일 때 반드시 숨기기(display:grid가 hidden을 덮지 않게) */
+.panel-chat .chat-empty[hidden] { display: none; }
+
+/* 당겨서 새로고침 중에는 글자 선택이 생기지 않게 */
+body.is-pulling {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: grabbing;
+}
+
 /* 당겨서 새로고침 인디케이터 — 화면 위쪽에서 손가락을 따라 내려옵니다 */
 .ptr {
   position: fixed;

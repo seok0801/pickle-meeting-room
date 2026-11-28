@@ -1109,45 +1109,67 @@
   }
 
   function onPtrStart(e) {
-    if (!ENTERED || ptrState.busy || e.touches.length !== 1) return;
-    ptrState.armed = false;
-    ptrState.locked = false;
-    ptrState.pull = 0;
-    if (!mayPullFrom(e.target)) return;
-    var sc = scrollableAncestor(e.target);
-    if (sc && sc.scrollTop > 0) { ptrState.scroller = null; return; }
-    ptrState.scroller = sc;
-    ptrState.startY = e.touches[0].clientY;
-    ptrState.startX = e.touches[0].clientX;
-    ptrState.armed = true;
+    if (e.touches.length !== 1) return;
+    var t = e.touches[0];
+    ptrBegin(t.clientY, t.clientX, e.target);
   }
 
   function onPtrMove(e) {
-    if (!ptrState.armed || ptrState.busy || e.touches.length !== 1) return;
+    if (e.touches.length !== 1) return;
     var t = e.touches[0];
-    var dy = t.clientY - ptrState.startY;
-    var dx = t.clientX - ptrState.startX;
+    ptrMove(t.clientY, t.clientX, e);
+  }
+
+  function onPtrEnd() {
+    ptrFinish();
+  }
+
+  // 터치·마우스 공통 상태기계 — 시작 지점과 당긴 높이만 받아 움직입니다.
+  function ptrBegin(y, x, target) {
+    if (!ENTERED || ptrState.busy) return;
+    ptrState.armed = false;
+    ptrState.locked = false;
+    ptrState.pull = 0;
+    if (!mayPullFrom(target)) return;
+    var sc = scrollableAncestor(target);
+    if (!sc) {
+      var panel = activePanel();
+      if (panel && panel.scrollHeight > panel.clientHeight + 2) sc = panel;
+    }
+    if (sc && sc.scrollTop > 0) { ptrState.scroller = null; return; }
+    ptrState.scroller = sc;
+    ptrState.startY = y;
+    ptrState.startX = x;
+    ptrState.armed = true;
+  }
+
+  function ptrMove(y, x, ev) {
+    if (!ptrState.armed || ptrState.busy) return;
+    var dy = y - ptrState.startY;
+    var dx = x - ptrState.startX;
     if (!ptrState.locked) {
       if (dy <= 0) { if (dy < -4) ptrState.armed = false; return; }
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) { ptrState.armed = false; return; }
       if (ptrState.scroller && ptrState.scroller.scrollTop > 0) { ptrState.armed = false; return; }
       if (dy < 8) return;
       ptrState.locked = true;
+      document.body.classList.add('is-pulling');
     }
     var pull = Math.min(PTR_MAX, dy * 0.52);
     ptrState.pull = pull;
-    if (e.cancelable) e.preventDefault();
+    if (ev && ev.cancelable) ev.preventDefault();
     ptrLabel(pull >= PTR_TRIGGER ? 'ready' : 'pull', pull >= PTR_TRIGGER ? '놓으면 새로고침' : '당겨서 새로고침');
     ptrPaint(pull, true);
   }
 
-  function onPtrEnd() {
+  function ptrFinish() {
     if (!ptrState.armed) return;
     var pull = ptrState.pull;
     var fired = ptrState.locked && pull >= PTR_TRIGGER;
     ptrState.armed = false;
     ptrState.locked = false;
     ptrState.pull = 0;
+    document.body.classList.remove('is-pulling');
     if (fired) {
       refreshNow();
     } else if (ptrEl) {
@@ -1160,6 +1182,24 @@
   document.addEventListener('touchmove', onPtrMove, { passive: false });
   document.addEventListener('touchend', onPtrEnd, { passive: true });
   document.addEventListener('touchcancel', onPtrEnd, { passive: true });
+
+  // 데스크탑에서는 마우스로도 같은 동작(아래로 끌어 당기기)을 쓸 수 있게 합니다.
+  document.addEventListener('pointerdown', function (e) {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    ptrBegin(e.clientY, e.clientX, e.target);
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (e.pointerType !== 'mouse') return;
+    ptrMove(e.clientY, e.clientX, e);
+  });
+  document.addEventListener('pointerup', function (e) {
+    if (e.pointerType !== 'mouse') return;
+    ptrFinish();
+  });
+  document.addEventListener('pointercancel', function (e) {
+    if (e.pointerType !== 'mouse') return;
+    ptrFinish();
+  });
 
   var btnRefresh = $('#btnRefresh');
   if (btnRefresh) btnRefresh.addEventListener('click', function () { refreshNow(); });
