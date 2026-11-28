@@ -70,8 +70,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 10px;
+  flex-wrap: nowrap;
 }
 
 .brand {
@@ -82,25 +82,25 @@ body {
 }
 
 .brand-badge {
-  width: 48px; height: 48px;
+  width: 40px; height: 40px;
   flex: 0 0 auto;
   display: grid; place-items: center;
   background: #fff;
   border: 2px solid var(--line-2);
-  border-radius: 16px;
+  border-radius: 14px;
   box-shadow: var(--shadow-sm);
 }
-.brand-badge svg { width: 34px; height: 34px; }
+.brand-badge svg { width: 28px; height: 28px; }
 
 .brand-text { display: flex; flex-direction: column; min-width: 0; }
 .brand-text strong {
-  font-size: clamp(18px, 2.4vw, 23px);
+  font-size: clamp(17px, 2vw, 20px);
   letter-spacing: -.02em;
   white-space: nowrap;
 }
 .brand-text small {
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: 10.5px;
   letter-spacing: .06em;
   text-transform: uppercase;
 }
@@ -115,13 +115,13 @@ body {
 .sync-chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 12px;
+  gap: 6px;
+  padding: 5px 11px;
   border-radius: 999px;
   background: #fff;
   border: 1px solid var(--line-2);
-  font-size: 12.5px;
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 800;
   color: var(--ink-2);
   box-shadow: var(--shadow-sm);
   white-space: nowrap;
@@ -240,7 +240,8 @@ body {
 .view > .panel { display: none; }
 .view > .panel.is-active { display: flex; min-height: 0; }
 .panel-agenda.is-active,
-.panel-attend.is-active { overflow-y: auto; overscroll-behavior: contain; flex: 1 1 auto; }
+.panel-attend.is-active,
+.panel-settings.is-active { overflow-y: auto; overscroll-behavior: contain; flex: 1 1 auto; }
 .panel-agenda .item-list,
 .panel-attend .attend-list { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
 .panel-agenda .item-form { margin-top: auto; }
@@ -254,7 +255,7 @@ body {
   z-index: 60;
   display: flex;
   gap: 6px;
-  width: min(94vw, 430px);
+  width: min(94vw, 520px);
   padding: 8px;
   border-radius: 26px;
   border: 1px solid var(--line-2);
@@ -930,6 +931,61 @@ input:focus, select:focus {
   white-space: nowrap;
 }
 
+/* ---------- 설정 탭 ---------- */
+.settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.setting-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: #FFFDF8;
+}
+.setting-card h3 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  color: var(--ink-2);
+}
+.setting-card .room-chip { max-width: 100%; }
+.setting-card .room-chip-name { max-width: 100%; }
+.setting-copy { display: inline-flex; align-items: center; gap: 6px; }
+.setting-copy svg { width: 13px; height: 13px; display: block; }
+.setting-state {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.setting-state .dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--ink-3);
+}
+.setting-state[data-state="online"] { color: #0C7A4C; }
+.setting-state[data-state="online"] .dot { background: #1FBF7A; }
+.setting-state[data-state="connecting"] .dot { background: var(--yellow-deep); animation: pulse 1.2s infinite; }
+.setting-state[data-state="error"] { color: #A3271B; }
+.setting-state[data-state="error"] .dot { background: #E5484D; }
+.setting-note {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--ink-3);
+  word-break: keep-all;
+}
+.setting-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
 /* ---------- dialog ---------- */
 .dialog {
   border: 0;
@@ -1084,7 +1140,8 @@ input:focus, select:focus {
   }
   .view > .panel { min-height: 0; }
   .view > .panel[data-panel="chat"],
-  .view > .panel[data-panel="agenda"] { grid-column: 1; grid-row: 1; }
+  .view > .panel[data-panel="agenda"],
+  .view > .panel[data-panel="settings"] { grid-column: 1; grid-row: 1; }
   /* 오른쪽 접속자 패널은 탭과 관계없이 늘 보입니다. */
   .view > .panel[data-panel="attend"] {
     display: flex;
@@ -1095,7 +1152,8 @@ input:focus, select:focus {
   /* 하단 독의 참가자 탭을 누르면 접속자 패널이 전체 폭으로 펼쳐집니다. */
   .view.is-attend-tab > .panel[data-panel="attend"] { grid-column: 1 / -1; }
   .view.is-attend-tab > .panel[data-panel="chat"],
-  .view.is-attend-tab > .panel[data-panel="agenda"] { display: none; }
+  .view.is-attend-tab > .panel[data-panel="agenda"],
+  .view.is-attend-tab > .panel[data-panel="settings"] { display: none; }
   .view.is-attend-tab .attend-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -1114,16 +1172,15 @@ input:focus, select:focus {
 }
 
 @media (max-width: 699px) {
-  .brand-badge { width: 42px; height: 42px; border-radius: 14px; }
-  .brand-badge svg { width: 29px; height: 29px; }
-  .topbar-actions { width: 100%; }
-  .room-chip { order: -2; flex: 1 1 auto; justify-content: center; padding-left: 10px; }
-  .room-chip-label { display: none; }
-  .room-chip-name { max-width: 40vw; }
-  .topbar-actions .btn { flex: 1 1 auto; text-align: center; padding: 9px 10px; font-size: 12.5px; }
-  .sync-chip { flex: 1 1 100%; justify-content: center; order: -1; }
+  .brand-badge { width: 36px; height: 36px; border-radius: 12px; }
+  .brand-badge svg { width: 25px; height: 25px; }
+  .brand-text strong { font-size: 16.5px; }
+  .brand-text small { font-size: 10px; }
+  .sync-chip { padding: 5px 9px; font-size: 11px; }
   .item-list { max-height: none; }
-  .dock { width: calc(100vw - 24px); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); border-radius: 24px; }
+  .dock { width: calc(100vw - 24px); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); border-radius: 24px; padding: 7px 6px; gap: 3px; }
+  .dock-btn { padding: 8px 2px 7px; font-size: 10.5px; }
+  .dock-ico svg { width: 21px; height: 21px; }
   .item-form-row select { max-width: 45%; }
 }
 

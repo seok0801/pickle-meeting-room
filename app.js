@@ -678,7 +678,7 @@
 
   /* ------------------------------ 하단 독 3탭 ------------------------------ */
 
-  var PANEL_TABS = ['chat', 'agenda', 'attend'];
+  var PANEL_TABS = ['chat', 'agenda', 'attend', 'settings'];
   var currentTab = 'chat';
   var dockButtons = Array.prototype.slice.call(document.querySelectorAll('.dock-btn'));
 
@@ -816,10 +816,16 @@
     }
 
     function chip(stateName, text) {
+      // 헤더에는 짧은 상태만, 설정 탭에는 자세한 상태를 보여 줍니다.
+      var headText = { online: '실시간', connecting: '연결 중', error: '오프라인', local: '로컬' };
       var chipEl = $('#syncChip');
-      if (!chipEl) return;
-      chipEl.dataset.state = stateName;
-      $('#syncChipText').textContent = text;
+      if (chipEl) chipEl.dataset.state = stateName;
+      var head = $('#syncChipText');
+      if (head) head.textContent = headText[stateName] || text;
+      var st = $('#syncState');
+      if (st) st.dataset.state = stateName;
+      var stText = $('#syncStateText');
+      if (stText) stText.textContent = text;
     }
 
     function stop() {
@@ -1101,10 +1107,10 @@
     var btn = $('#btnCopyRoom');
     var label = $('#btnCopyRoomText');
     var done = function (ok) {
-      label.textContent = ok ? '복사됨' : '복사 실패';
+      label.textContent = ok ? '초대 링크 복사됨' : '복사 실패';
       btn.classList.toggle('is-done', ok);
       setTimeout(function () {
-        label.textContent = '복사';
+        label.textContent = '초대 링크 복사';
         btn.classList.remove('is-done');
       }, 1800);
     };
