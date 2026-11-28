@@ -7,7 +7,7 @@
 <meta name="description" content="귀여운 피클들이 함께 모여 회의하는 합동 회의실. 출석 보드, 회의 안건·할 일, 실시간 말풍선 채팅방. AI 사단 통합 관제실 모드 포함.">
 <meta name="theme-color" content="#FFD84D">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css?v=20261128z3">
+<link rel="stylesheet" href="styles.css?v=20261128z4">
 <script>
 /* 화면 검증용 최소 오류 기록 — 오류 메시지만 html[data-js-errors]에 모읍니다(데이터·비밀값 없음). */
 (function () {
@@ -108,9 +108,18 @@
         <div class="target-chips" id="targetChips" role="group" aria-label="메시지 지시 대상 선택"></div>
       </div>
 
+      <!-- 첨부 사진 미리보기 칩 — 붙여넣기·선택하면 입력창 위에 뜨고 ×로 뺍니다 -->
+      <div class="photo-chip" id="photoChip" hidden>
+        <img class="photo-chip-img" id="photoChipImg" alt="첨부한 사진 미리보기">
+        <span class="photo-chip-text" id="photoChipText">사진</span>
+        <button type="button" class="photo-chip-x" id="photoChipRemove" aria-label="첨부한 사진 빼기" title="첨부한 사진 빼기">×</button>
+      </div>
+
       <form class="chat-form" id="formChat" autocomplete="off">
         <label class="sr-only" for="chatText">메시지</label>
-        <textarea id="chatText" rows="1" maxlength="380" placeholder="메시지를 입력하고 Enter" enterkeyhint="send" autocapitalize="off" autocorrect="off" spellcheck="false" required></textarea>
+        <button type="button" class="chat-photo" id="btnPhoto" aria-label="사진 첨부" title="사진 첨부 (Ctrl+V 붙여넣기도 됩니다)">📷</button>
+        <input type="file" id="chatPhotoInput" accept="image/*" hidden>
+        <textarea id="chatText" rows="1" maxlength="8000" placeholder="메시지를 입력하고 Enter" enterkeyhint="send" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
         <button type="submit" class="btn btn-primary chat-send">전송</button>
       </form>
     </section>
@@ -281,6 +290,12 @@
 
 </div>
 
+<!-- ============ 사진 확대 보기 ============ -->
+<div class="img-modal" id="imgModal" role="dialog" aria-modal="true" aria-label="사진 크게 보기" hidden>
+  <button type="button" class="img-modal-close" id="imgModalClose" aria-label="닫기">×</button>
+  <img class="img-modal-img" id="imgModalImg" alt="첨부 사진 크게 보기">
+</div>
+
 <!-- ============ 관제실/가족방 접속 정보 입력 ============ -->
 <dialog class="dialog" id="modeDialog" aria-labelledby="modeDialogTitle">
   <form class="dialog-body" id="formModeDialog" autocomplete="off">
@@ -302,6 +317,6 @@
   </form>
 </dialog>
 
-<script src="app.js?v=20261128z3"></script>
+<script src="app.js?v=20261128z4"></script>
 </body>
 </html>

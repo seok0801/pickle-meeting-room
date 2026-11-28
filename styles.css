@@ -26,11 +26,19 @@
 
 * { box-sizing: border-box; }
 
+/* 카카오톡·피클 채팅처럼 바깥 페이지는 아예 스크롤되지 않게 고정합니다.
+   스크롤은 가운데 채팅 타임라인(.chat-feed) 안에서만 일어나므로
+   헤더가 위로 밀려 잘리거나 화면 전체가 흔들리는 일이 없습니다. */
 html, body {
+  position: fixed;
+  inset: 0;
   margin: 0;
   padding: 0;
+  width: 100%;
+  height: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -40,7 +48,6 @@ body {
     radial-gradient(1200px 500px at 12% -10%, #FFF3CF 0%, rgba(255, 243, 207, 0) 60%),
     radial-gradient(900px 420px at 92% 0%, #EAF1FF 0%, rgba(234, 241, 255, 0) 55%),
     var(--cream);
-  min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   line-height: 1.5;
 }
@@ -55,12 +62,14 @@ body {
 .app {
   width: 100%;
   max-width: 1180px;
-  /* 모바일 키보드가 올라오면 보이는 높이(--app-vh)에 맞춰 줄어들고,
+  /* 화면에 꽉 고정합니다 — 바깥 페이지 스크롤 없음.
+     모바일 키보드가 올라오면 보이는 높이(--app-vh)에 맞춰 줄어들고,
      문서가 밀린 만큼(--app-top) 아래로 내려가 입력창이 키보드에 가리지 않습니다. (app.js syncViewport) */
-  height: var(--app-vh, 100dvh);
-  min-height: var(--app-vh, 100dvh);
-  position: relative;
+  position: fixed;
+  left: 0;
+  right: 0;
   top: var(--app-top, 0px);
+  height: var(--app-vh, 100%);
   margin: 0 auto;
   /* 상단 헤더 · 가운데 화면 · 하단 독(떠 있는 바) 순서로 남는 높이를 전부 씁니다. */
   padding: 0 0 calc(84px + env(safe-area-inset-bottom, 0px));
@@ -932,13 +941,138 @@ input:focus, select:focus, textarea:focus {
 }
 .chat-send { flex: 0 0 auto; padding: 10px 16px; margin-bottom: 1px; }
 
+/* 사진 첨부 버튼 — 입력창 왼쪽 동그란 버튼 */
+.chat-photo {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-2);
+  background: #fff;
+  cursor: pointer;
+  margin-bottom: 1px;
+  -webkit-tap-highlight-color: transparent;
+}
+.chat-photo:active { transform: translateY(1px); }
+.chat-photo:focus-visible { outline: 3px solid rgba(47, 107, 255, .35); outline-offset: 2px; }
+body[data-mode="ai"] .chat-photo { background: #101B2D; border-color: #2C3E5C; }
+
+/* 첨부 사진 미리보기 칩 (입력창 바로 위) */
+.photo-chip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+}
+.photo-chip[hidden] { display: none; }
+.photo-chip-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1.5px solid var(--line-2);
+  background: #fff;
+  flex: 0 0 auto;
+}
+.photo-chip-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.photo-chip-x {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-2);
+  background: #fff;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+body[data-mode="ai"] .photo-chip { background: #0C1422; border-top-color: #1E2A3F; }
+body[data-mode="ai"] .photo-chip-text { color: #9FB2CC; }
+body[data-mode="ai"] .photo-chip-x { background: #101B2D; border-color: #2C3E5C; color: #9FB2CC; }
+
+/* 말풍선 안의 사진 — 둥근 모서리, 누르면 크게 보기 */
+.msg-photo {
+  display: block;
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  max-width: 100%;
+}
+.msg-photo:last-child { margin-bottom: 0; }
+.msg-photo img {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: #fff;
+}
+.msg-bubble.has-photo { padding: 6px; }
+.msg-bubble.has-photo .msg-photo img { max-width: 240px; }
+
+/* 사진 확대 보기 */
+.img-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(8, 12, 20, .86);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.img-modal[hidden] { display: none; }
+.img-modal-img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
+  background: #fff;
+}
+.img-modal-close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .35);
+  background: rgba(20, 26, 38, .7);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 /* 채팅 입력창 — 한 줄 높이로 시작해 입력한 만큼(최대 5줄, 112px) 늘어나고,
    그보다 길면 입력창 안에서 스크롤됩니다. 길게 쓴 오더·프롬프트가 잘리지 않습니다. */
 #chatText {
   display: block;
   width: 100%;
   min-height: 40px;
-  max-height: 112px;
+  max-height: 120px;
   padding: 9px 14px;
   border-radius: 20px;
   font: inherit;
@@ -1173,11 +1307,15 @@ input:focus, select:focus, textarea:focus {
 
 /* ---------- 잠금 화면 (초대 전용) ---------- */
 .lock {
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: clamp(18px, 5vw, 48px) clamp(14px, 4vw, 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .lock[hidden] { display: none; }
 .lock-card {

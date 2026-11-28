@@ -6,6 +6,8 @@
 
   var KEY_HEAD = 'pickle-meeting-room/v2';
   var MAX_TL = 60;
+  var MAX_CHAT_TEXT = 8000;        // 한 메시지 글자 수 상한 (RTDB 규칙과 같은 8000자)
+  var MAX_IMAGE_CHARS = 400000;    // 말풍선 사진(data URL) 상한 — RTDB 규칙과 맞춤
   var MIN_KEY_LEN = 20;   // RTDB 규칙과 같은 초대 키 최소 길이
 
   // 무료 Firebase Realtime Database(Spark 플랜 · 싱가포르 리전) — 주소만 미리 넣어 둡니다.
@@ -228,23 +230,47 @@
     var timeline = asList(s.timeline).filter(function (m) { return !!(m && typeof m.text === 'string' && m.text.trim()); });
     var timelineTs = fillMissingTs(timeline);
     timeline.forEach(function (m, i) {
-      out.timeline.push({
+      var msg = {
         id: String(m.id || uid('t')),
         who: String(m.who || '피클').slice(0, 24),
-        text: String(m.text).slice(0, 400),
+        text: String(m.text).slice(0, MAX_CHAT_TEXT),
         ts: timelineTs[i],
         kind: m.kind === 'note' ? 'note' : 'pickle'
-      });
+      };
+      var img = safeImage(m.image);
+      if (img) msg.image = img;
+      out.timeline.push(msg);
     });
     return out;
+  }
+
+  // 말풍선 사진은 data:image/... 만 허용합니다(다른 스킴·스크립트 주입 차단).
+  function safeImage(v) {
+    if (typeof v !== 'string') return '';
+    if (v.slice(0, 11) !== 'data:image/') return '';
+    if (!/^data:image\/(jpeg|jpg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(v)) return '';
+    if (v.length > MAX_IMAGE_CHARS) return '';
+    return v;
   }
 
   function save() {
     if (!INVITE.room || !INVITE.key) return;   // 초대 없이 열린 잠금 화면에서는 아무것도 저장하지 않는다
     state.updatedAt = Date.now();
     trimTimeline();
-    try { localStorage.setItem(stateKey(), JSON.stringify(state)); } catch (e) { /* 용량 초과 등 */ }
+    saveLocal();
     Sync.push();
+  }
+
+  // 사진이 쌓이면 localStorage(약 5MB) 용량을 넘길 수 있습니다.
+  // 넘칠 때만 오래된 사진부터 빼고 다시 저장해, 기록 자체가 날아가지 않게 합니다.
+  function saveLocal() {
+    try {
+      localStorage.setItem(stateKey(), JSON.stringify(state));
+      return;
+    } catch (e) { /* 용량 초과 — 아래에서 사진만 빼고 재시도 */ }
+    var slim = JSON.parse(JSON.stringify(state));
+    slim.timeline.forEach(function (m) { delete m.image; });
+    try { localStorage.setItem(stateKey(), JSON.stringify(slim)); } catch (e2) { /* 그래도 실패하면 포기 */ }
   }
 
   function trimTimeline() {
@@ -797,14 +823,17 @@
     return at + ' ' + text;
   }
 
-  function addLine(who, text, kind) {
-    state.timeline.push({
+  function addLine(who, text, kind, image) {
+    var line = {
       id: uid('t'),
       who: who,
-      text: String(text).slice(0, 400),
+      text: String(text).slice(0, MAX_CHAT_TEXT),
       ts: Date.now(),
       kind: kind === 'note' ? 'note' : 'pickle'
-    });
+    };
+    var img = safeImage(image);
+    if (img) line.image = img;
+    state.timeline.push(line);
     if (state.timeline.length > MAX_TL) state.timeline = state.timeline.slice(-MAX_TL);
   }
 
@@ -871,6 +900,20 @@
 
       var line = el('div', 'msg-line');
       var bubble = el('div', 'msg-bubble');
+      var img = safeImage(m.image);
+      if (img) {
+        bubble.classList.add('has-photo');
+        var shot = el('button', 'msg-photo');
+        shot.type = 'button';
+        shot.setAttribute('aria-label', (m.who || '피클') + '가 보낸 사진 크게 보기');
+        var im = document.createElement('img');
+        im.src = img;
+        im.alt = '첨부 사진';
+        im.loading = 'lazy';
+        im.decoding = 'async';
+        shot.appendChild(im);
+        bubble.appendChild(shot);
+      }
       fillBubble(bubble, m.text);
       bubble.title = day + ' ' + fmtTime(m.ts);
       var time = el('span', 'msg-time', fmtTime(m.ts));
@@ -939,8 +982,8 @@
 
   /* ------------------------------ 채팅 입력창 (여러 줄) ------------------------------ */
 
-  // 한 줄 높이에서 시작해 입력한 줄 수만큼 늘어나고(최대 5줄), 그보다 길면 입력창 안에서 스크롤됩니다.
-  var CHAT_MAX_H = 112;
+  // 한 줄 높이에서 시작해 입력한 줄 수만큼 늘어나고(최대 5줄 · 약 120px), 그보다 길면 입력창 안에서 스크롤됩니다.
+  var CHAT_MAX_H = 120;
   function autoResize() {
     var input = $('#chatText');
     if (!input || input.tagName !== 'TEXTAREA') return;
@@ -963,6 +1006,79 @@
     autoResize();
   }
 
+  /* ------------------------------ 사진 첨부 (선택 · 붙여넣기) ------------------------------ */
+
+  // 브라우저 Canvas로 최대 폭 960px JPEG(품질 0.72)로 줄입니다 — 휴대폰 원본 그대로보다 가볍게.
+  var PHOTO_MAX_W = 960;
+  var PHOTO_QUALITY = 0.72;
+  var PHOTO_HARD_MAX = 360000;   // data URL 길이 상한(규칙 400,000자보다 약간 안쪽)
+
+  function canvasToJpeg(src, maxW, quality) {
+    return new Promise(function (resolve, reject) {
+      var im = new Image();
+      im.onload = function () {
+        try {
+          var w = im.naturalWidth || im.width;
+          var h = im.naturalHeight || im.height;
+          if (!w || !h) { reject(new Error('empty image')); return; }
+          var scale = Math.min(1, maxW / w);
+          var cw = Math.max(1, Math.round(w * scale));
+          var ch = Math.max(1, Math.round(h * scale));
+          var cv = document.createElement('canvas');
+          cv.width = cw;
+          cv.height = ch;
+          var ctx = cv.getContext('2d');
+          // 투명 PNG를 JPEG로 바꿀 때 검게 변하지 않도록 흰 바탕을 먼저 깝니다.
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, cw, ch);
+          ctx.drawImage(im, 0, 0, cw, ch);
+          resolve(cv.toDataURL('image/jpeg', quality));
+        } catch (e) { reject(e); }
+      };
+      im.onerror = function () { reject(new Error('decode failed')); };
+      im.src = src;
+    });
+  }
+
+  // 품질·폭을 순차로 줄여 가며 규칙 상한 안으로 넣습니다.
+  async function compressPhoto(file) {
+    var src = await new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(String(reader.result || '')); };
+      reader.onerror = function () { reject(new Error('read failed')); };
+      reader.readAsDataURL(file);
+    });
+    var out = await canvasToJpeg(src, PHOTO_MAX_W, PHOTO_QUALITY);
+    if (out.length <= PHOTO_HARD_MAX) return out;
+    out = await canvasToJpeg(src, 720, 0.6);
+    if (out.length <= PHOTO_HARD_MAX) return out;
+    return canvasToJpeg(src, 560, 0.5);
+  }
+
+  var pendingImage = '';
+  var pendingImageName = '';
+
+  function setPendingImage(dataUrl, label) {
+    pendingImage = safeImage(dataUrl) || '';
+    pendingImageName = pendingImage ? String(label || '사진') : '';
+    var chip = $('#photoChip');
+    var img = $('#photoChipImg');
+    var txt = $('#photoChipText');
+    if (img) { if (pendingImage) img.src = pendingImage; else img.removeAttribute('src'); }
+    if (txt) txt.textContent = pendingImage ? (pendingImageName || '사진') + ' 첨부됨' : '';
+    if (chip) chip.hidden = !pendingImage;
+  }
+
+  function attachPhoto(file) {
+    if (!file) return;
+    if (file.type && file.type.indexOf('image/') !== 0) return;
+    compressPhoto(file).then(function (dataUrl) {
+      setPendingImage(dataUrl, file.name || '사진');
+      var input = $('#chatText');
+      if (input) input.focus();
+    }).catch(function () { /* 읽지 못한 파일은 조용히 무시 */ });
+  }
+
   var composerWired = false;
   function wireComposer() {
     var input = $('#chatText');
@@ -978,30 +1094,103 @@
     input.addEventListener('keydown', function (e) {
       if (e.key !== 'Enter' || e.shiftKey) return;
       if (e.isComposing || e.keyCode === 229 || composing || Date.now() - composedAt < 40) return;
+      // 글자 수 상한을 넘은 채로 Enter를 치면 잘리지 않게 먼저 막고 알려 줍니다.
+      if (input.value.length > MAX_CHAT_TEXT) return;
       e.preventDefault();
-      if (!input.value.trim()) return;
+      if (!input.value.trim() && !pendingImage) return;
       var form = $('#formChat');
       if (!form) return;
       if (typeof form.requestSubmit === 'function') form.requestSubmit();
       else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
     });
+
+    // 클립보드에 이미지가 있으면 가로채 첨부합니다(스크린샷 복사 → 붙여넣기).
+    input.addEventListener('paste', function (e) {
+      var cd = e.clipboardData;
+      if (!cd || !cd.items) return;
+      for (var i = 0; i < cd.items.length; i++) {
+        var it = cd.items[i];
+        if (it && it.kind === 'file' && it.type && it.type.indexOf('image/') === 0) {
+          e.preventDefault();
+          attachPhoto(it.getAsFile());
+          return;
+        }
+      }
+    });
     autoResize();
   }
   wireComposer();
+
+  (function wirePhoto() {
+    var btn = $('#btnPhoto');
+    var picker = $('#chatPhotoInput');
+    var remove = $('#photoChipRemove');
+    if (btn && picker) {
+      btn.addEventListener('click', function () { picker.click(); });
+      picker.addEventListener('change', function () {
+        var f = picker.files && picker.files[0];
+        if (f) attachPhoto(f);
+        try { picker.value = ''; } catch (e) {}
+      });
+    }
+    if (remove) {
+      remove.addEventListener('click', function () {
+        setPendingImage('', '');
+        var input = $('#chatText');
+        if (input) input.focus();
+      });
+    }
+  })();
 
   $('#formChat').addEventListener('submit', function (e) {
     e.preventDefault();
     var input = $('#chatText');
     var text = input.value.trim();
-    if (!text) { input.focus(); return; }
-    addLine('나', withTarget(text), 'note');
+    var image = pendingImage;
+    if (!text && !image) { input.focus(); return; }
+    if (text.length > MAX_CHAT_TEXT) text = text.slice(0, MAX_CHAT_TEXT);
+    // 사진만 보낼 때도 RTDB 규칙(text 필수)을 통과하도록 안내 문구를 넣습니다.
+    addLine('나', withTarget(text || '📷 사진'), 'note', image);
     input.value = '';
+    setPendingImage('', '');
     resetComposerHeight();
     save();
     renderChat();
     if (chatFeed) chatFeed.scrollTop = chatFeed.scrollHeight;
     input.focus();
   });
+
+  /* ------------------------------ 사진 확대 보기 ------------------------------ */
+
+  (function wireImgModal() {
+    var modal = $('#imgModal');
+    var big = $('#imgModalImg');
+    if (!modal || !big) return;
+    function openBig(src) {
+      big.src = src;
+      modal.hidden = false;
+    }
+    function closeBig() {
+      modal.hidden = true;
+      big.removeAttribute('src');
+    }
+    // 말풍선 사진을 누르면 크게 봅니다(이벤트 위임 — 다시 그려도 그대로 동작).
+    if (chatFeed) {
+      chatFeed.addEventListener('click', function (e) {
+        var n = e.target;
+        while (n && n !== chatFeed && !(n.classList && n.classList.contains('msg-photo'))) n = n.parentNode;
+        if (!n || n === chatFeed) return;
+        var img = n.querySelector('img');
+        if (img && img.src) openBig(img.src);
+      });
+    }
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal || (e.target && e.target.id === 'imgModalClose')) closeBig();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.hidden) closeBig();
+    });
+  })();
 
   /* ------------------------------ 하단 독 3탭 ------------------------------ */
 
@@ -1505,12 +1694,28 @@
       }, 5000);
     }
 
+    // 방 전체를 PUT하므로 사진이 많으면 본문이 커집니다. RTDB 한도(16MB)에 닿지 않게
+    // 아주 클 때만 오래된 사진부터 덜어 낸 사본을 보냅니다(글은 그대로).
+    var PUSH_MAX_CHARS = 6000000;
+    function bodyForSend() {
+      var json = JSON.stringify(state);
+      if (json.length <= PUSH_MAX_CHARS) return json;
+      var copy = JSON.parse(json);
+      for (var i = 0; i < copy.timeline.length; i++) {
+        if (!copy.timeline[i].image) continue;
+        delete copy.timeline[i].image;
+        json = JSON.stringify(copy);
+        if (json.length <= PUSH_MAX_CHARS) break;
+      }
+      return json;
+    }
+
     function send() {
       if (!cfg.url || !cfg.room || !cfg.key) return Promise.resolve(false);
       return fetch(endpoint(), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state)
+        body: bodyForSend()
       }).then(function (r) {
         if (!r.ok) chip('error', '저장 실패 (' + r.status + ')');
         return !!r.ok;
@@ -1971,6 +2176,7 @@
 
   // iOS Safari·홈화면 PWA는 키보드가 올라와도 100dvh가 줄지 않아 하단 입력창이 키보드 뒤로 숨습니다.
   // 보이는 높이(visualViewport)에 맞춰 앱 높이를 줄이고, 문서가 밀린 만큼 앱을 내려 입력창을 키보드 위에 둡니다.
+  // 키보드가 올라온 동안에는 하단 독(4탭)을 숨겨 입력창이 키보드 바로 위에 붙게 합니다.
   (function syncViewport() {
     var vv = window.visualViewport;
     var root = document.documentElement;
@@ -1979,19 +2185,26 @@
       var h = inner;
       var top = 0;
       if (vv) {
-        h = Math.min(vv.height, inner);
+        h = Math.min(vv.height, inner || vv.height);
         top = Math.max(0, Math.round(vv.offsetTop || 0));
       }
       if (h > 0) {
         root.style.setProperty('--app-vh', Math.round(h) + 'px');
         root.style.setProperty('--app-top', top + 'px');
       }
-      var kb = !!(vv && inner - vv.height > 120);
+      // 키보드가 올라온 상태 — 보이는 높이가 창 높이의 78%보다 작아졌을 때
+      var kb = !!(vv && inner > 0 && vv.height < inner * 0.78);
+      var wasKb = root.classList.contains('is-kb');
       root.classList.toggle('is-kb', kb);
+      // iOS가 문서를 살짝 밀어 놓아도 헤더가 위로 사라지지 않게 되돌립니다.
+      if (window.scrollY || window.pageYOffset) window.scrollTo(0, 0);
       if (kb) {
         autoResize();
         var input = $('#chatText');
         if (chatFeed && input && document.activeElement === input) chatFeed.scrollTop = chatFeed.scrollHeight;
+      } else if (wasKb) {
+        // 키보드가 내려가면 독이 다시 나타나므로 입력창 높이를 다시 재고 채팅 맨 아래로 맞춥니다.
+        autoResize();
       }
     }
     apply();
@@ -2003,9 +2216,22 @@
     }
   })();
 
+  // 입력창을 누르면(키보드가 올라오기 직전) 채팅 맨 아래로 맞춰 둡니다.
+  (function wireComposerFocus() {
+    var input = $('#chatText');
+    if (!input) return;
+    ['focus', 'pointerdown'].forEach(function (ev) {
+      input.addEventListener(ev, function () {
+        if (!chatFeed) return;
+        chatFeed.scrollTop = chatFeed.scrollHeight;
+        setTimeout(function () { chatFeed.scrollTop = chatFeed.scrollHeight; }, 280);
+      });
+    });
+  })();
+
   // 화면 검증용 최소 상태(비밀값 없음) — 자동 점검이 앱이 끝까지 실행됐는지 확인합니다.
   window.__PMR = {
-    version: '20261128z3',
+    version: '20261128z4',
     ready: true,
     mode: function () { return CURRENT_MODE; },
     tab: function () { return currentTab; },
@@ -2022,6 +2248,33 @@
         scrollHeight: i.scrollHeight,
         overflowY: window.getComputedStyle(i).overflowY,
         focused: document.activeElement === i
+      };
+    },
+    // 사진 첨부·말풍선 상태(사진 내용은 담지 않습니다)
+    photo: function () {
+      var chip = $('#photoChip');
+      var imgs = document.querySelectorAll('.msg-photo img');
+      return {
+        pending: !!safeImage(pendingImage),
+        chipVisible: !!(chip && !chip.hidden),
+        bubbles: imgs.length
+      };
+    },
+    // 화면 고정 상태 — 바깥 문서가 스크롤되지 않는지 확인용
+    layout: function () {
+      var app = $('#appRoot');
+      var feed = $('#chatFeed');
+      var dock = document.querySelector('.dock');
+      return {
+        docScroll: Math.round(window.scrollY || window.pageYOffset || 0),
+        bodyOverflow: window.getComputedStyle(document.body).overflowY,
+        appPos: app ? window.getComputedStyle(app).position : null,
+        appHeight: app ? Math.round(app.getBoundingClientRect().height) : 0,
+        dockHidden: dock ? window.getComputedStyle(dock).display === 'none' : null,
+        feedScrollable: feed ? feed.scrollHeight > feed.clientHeight : null,
+        kb: document.documentElement.classList.contains('is-kb'),
+        innerHeight: window.innerHeight,
+        vvHeight: window.visualViewport ? Math.round(window.visualViewport.height) : null
       };
     },
     refresh: refreshNow,

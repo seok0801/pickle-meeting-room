@@ -51,12 +51,17 @@
   우리 측(`who: '나'`, `who: '주봇'`)은 오른쪽, 외부 피클(모모 등)은 왼쪽으로 좌우가 교차되고,
   오른쪽에서도 나는 노란 말풍선·`나` 배지, 주봇은 파란 말풍선·이름 배지로 구분됩니다.
   입력창에서 Enter 또는 **전송** 버튼으로 보내면 RTDB로 실시간 공유되어 새 메시지가 바로 말풍선으로 붙습니다.
-  입력창은 여려 줄 입력을 받는 `textarea`(최대 380자)로, 한 줄로 시작해 입력한 만큼 최대 5줄(112px)까지 늘어나고
+  입력창은 여려 줄 입력을 받는 `textarea`(최대 **8,000자**)로, 한 줄로 시작해 입력한 만큼 최대 5줄(약 120px)까지 늘어나고
   그보다 길면 입력창 안에서 스크롤됩니다. **Enter는 전송, Shift+Enter는 줄바꿈**이며,
   한글 입력기(IME)가 조합 중일 때(keyCode 229)의 Enter로는 전송하지 않습니다.
   보낸 메시지의 줄바꿈은 말풍선에서도 `white-space: pre-wrap`으로 그대로 보입니다.
-  모바일 키보드가 올라오면 보이는 화면 높이(`visualViewport`)에 맞춰 앱을 줄이고 입력창을 키보드 바로 위로 올립니다.
+  모바일 키보드가 올라오면 보이는 화면 높이(`visualViewport`)에 맞춰 앱을 줄이고 입력창을 키보드 바로 위로 올리며,
+  키보드가 올라온 동안에는 하단 독(4탭)을 숨겨 채팅 공간을 넓힙니다.
   데이터는 기존 `timeline` 배열(`who`·`text`·`ts`·`kind`)을 그대로 쓰므로 예전 기록과 호환됩니다.
+- **사진 첨부** — 입력창 왼쪽 `📷` 버튼으로 고르거나 입력창에 붙여넣기(Ctrl+V·스크린샷)하면
+  Canvas로 최대 폭 960px JPEG(품질 0.72)로 줄여 전송합니다. 보내기 전 입력창 위에 미리보기 칩(×로 빼기)이 뜨고,
+  받은 사진은 말풍선 안 둥근 이미지로 보이며 누르면 크게 볼 수 있습니다. 사진만 보낼 때는 `text`에 `📷 사진`이 들어갑니다.
+  말풍선 사진은 `image` 필드(`data:image/jpeg;base64,...`, `data:image/`만 허용)로 저장됩니다.
 - **진행 중(•••) 표시** — 출석 피클 중 상태가 `작업중`인 피클이 있으면 채팅 입력창 위에 움직이는 점 세 개와
   “이름 · 역할 처리 중…” 말풍선이 뜨고, 다른 상태(접속 등)로 바뀌면 즉시 사라집니다. RTDB에 새 필드를 만들지 않고 `pickles[].status`만 씁니다.
 - **대상 지정(@멘션)** — 채팅 입력창 바로 위 **대상 칩 바**(`전체` + 접속 피클, 접속·작업중 우선)에서 피클을 고르면
@@ -91,7 +96,7 @@
   규칙 본문은 공개되지 않습니다(비로그인 `GET /.settings/rules.json` → 403).
 
 ```json
-{"rules":{".read":false,".write":false,"rooms":{".read":false,".write":false,"$roomId":{".read":false,".write":false,"$inviteKey":{".read":"<초대 키 일치 검사>",".write":"<초대 키 일치 검사>",".validate":"newData.hasChildren(['version','updatedAt'])","version":{".validate":"newData.isNumber()"},"updatedAt":{".validate":"newData.isNumber()"},"pickles":{"$id":{".validate":"newData.hasChildren(['name']) && newData.child('name').val().length <= 24"}},"items":{"$id":{".validate":"newData.hasChildren(['title']) && newData.child('title').val().length <= 160"}},"timeline":{"$id":{".validate":"newData.hasChildren(['text']) && newData.child('text').val().length <= 400"}},"$other":{".validate":false}}}}}}
+{"rules":{".read":false,".write":false,"rooms":{".read":false,".write":false,"$roomId":{".read":false,".write":false,"$inviteKey":{".read":"<초대 키 일치 검사>",".write":"<초대 키 일치 검사>",".validate":"newData.hasChildren(['version','updatedAt'])","version":{".validate":"newData.isNumber()"},"updatedAt":{".validate":"newData.isNumber()"},"pickles":{"$id":{".validate":"newData.hasChildren(['name']) && newData.child('name').val().length <= 24"}},"items":{"$id":{".validate":"newData.hasChildren(['title']) && newData.child('title').val().length <= 160"}},"timeline":{"$id":{".validate":"newData.hasChildren(['text']) && newData.child('text').val().length <= 8000","text":{".validate":"newData.isString() && newData.val().length <= 8000"},"image":{".validate":"!newData.exists() || (newData.isString() && newData.val().length <= 400000)"}}},"$other":{".validate":false}}}}}}
 ```
 
 > 🔒 실제 방 ID와 초대 키는 이 저장소·커밋·README에 적지 않습니다. 관제실(`ai_…`)과 가족 회의실(`rm_…`) 모두 초대 링크로만 나눠 주고,
