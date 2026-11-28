@@ -1185,6 +1185,188 @@ input:focus, select:focus {
   word-break: keep-all;
 }
 
+/* ---------- 모드 바 (가족 회의실 / 🧭 AI 관제실) ---------- */
+.brand-badge .ico-ai { display: none; }
+.mode-bar {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: rgba(255, 253, 246, .92);
+  box-shadow: var(--shadow-sm);
+  max-width: 100%;
+}
+.mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.mode-btn:hover { color: var(--ink-2); }
+.mode-btn.is-active {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 2px 6px rgba(160, 132, 62, .16);
+}
+.mode-btn:focus-visible { outline: 3px solid rgba(47, 107, 255, .35); outline-offset: 2px; }
+.mode-emoji { font-size: 13px; line-height: 1; }
+/* 저장된 접속 정보가 있는 모드에만 붙는 작은 초록 점 */
+.mode-btn.has-room::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #1FBF7A;
+  box-shadow: 0 0 0 2px #fff;
+  margin-left: 1px;
+}
+
+/* ---------- AI 관제실 요약 배지 ---------- */
+.ai-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 12px 10px;
+  border-radius: var(--r-md);
+  border: 1px solid #22314A;
+  background: #0F1A2B;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+}
+.ai-summary[hidden] { display: none; }
+.ai-sum-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ai-sum-title {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  color: #7C8CA6;
+  text-transform: uppercase;
+}
+.ai-sse {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid #2C3E5C;
+  background: #0B1220;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #8FA2BE;
+  white-space: nowrap;
+}
+.ai-sse .dot { width: 7px; height: 7px; border-radius: 50%; background: #7C8CA6; }
+.ai-sse[data-state="online"] { border-color: #1E5A3C; background: #0C2318; color: #6EE7A8; }
+.ai-sse[data-state="online"] .dot { background: #34D399; box-shadow: 0 0 0 3px rgba(52, 211, 153, .16); }
+.ai-sse[data-state="connecting"] .dot { background: #F0B800; animation: pulse 1.2s infinite; }
+.ai-sse[data-state="error"] { border-color: #7F2A2D; background: #2A1113; color: #FCA5A5; }
+.ai-sse[data-state="error"] .dot { background: #F87171; }
+.ai-sum-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.ai-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 5px 2px 6px;
+  border-radius: 10px;
+  background: #0B1220;
+  border: 1px solid #1B2A42;
+  min-width: 0;
+}
+.ai-stat b { font-size: 16px; font-weight: 800; line-height: 1.1; color: #E7EEF9; }
+.ai-stat span {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: #7C8CA6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.ai-stat[data-stat="online"] b { color: #4ADE80; }
+.ai-stat[data-stat="working"] b { color: #60A5FA; }
+.ai-stat[data-stat="exhausted"] b { color: #FB923C; }
+.ai-stat[data-stat="offline"] b { color: #F87171; }
+.ai-stat[data-stat="open"] b { color: #FFD84D; }
+
+/* ---------- 사단 카드 소속 태그 · 담당자 배지 · 일감 구분 줄 ---------- */
+.agent-tag {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #EAF0FF;
+  color: #1B47B8;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1.5;
+  letter-spacing: .02em;
+}
+.owner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink-2);
+}
+.owner-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #9A9384; }
+.owner-badge[data-status="online"] .owner-dot { background: #16A34A; }
+.owner-badge[data-status="working"] .owner-dot { background: #2563EB; }
+.owner-badge[data-status="exhausted"] .owner-dot { background: #F97316; }
+.owner-badge[data-status="offline"] .owner-dot { background: #DC2626; }
+.queue-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 2px 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  color: var(--ink-3);
+}
+.queue-head-count {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #F2F1EE;
+  color: var(--ink-2);
+  font-size: 10px;
+  letter-spacing: 0;
+}
+.queue-head[data-kind="done"] { color: #9A9384; }
+
+.room-chip[data-kind="ai"] { border-color: #C6D6FF; background: #F2F6FF; }
+.room-chip[data-kind="ai"] .room-chip-label,
+.room-chip[data-kind="ai"] .room-chip-name { color: #1B47B8; }
+.setting-state[data-state="ai"] { color: #1B47B8; }
+.setting-state[data-state="ai"] .dot { background: #2563EB; }
+
 /* ---------- responsive ---------- */
 /* ---------- 데스크탑: 왼쪽 채팅방 · 오른쪽 접속자 패널 ---------- */
 @media (min-width: 960px) {
@@ -1251,4 +1433,191 @@ input:focus, select:focus {
 
 @media (hover: none) {
   .attend-del, .item-del { padding: 8px; }
+}
+
+/* ============================================================
+   🧭 AI 사단 통합 관제실 모드 — 다크 슬레이트 관제 대시보드
+   (body[data-mode="ai"]일 때만 적용, 가족 회의실은 기존 파스텔 그대로)
+   ============================================================ */
+body[data-mode="ai"] {
+  --ai-bg: #0B1220;
+  --ai-panel: #111C2E;
+  --ai-panel-2: #0F1A2B;
+  --ai-line: #22314A;
+  --ai-line-2: #2C3E5C;
+  --ai-text: #E7EEF9;
+  --ai-dim: #B4C2D8;
+  --ai-mute: #7C8CA6;
+  --ai-bubble: #17253C;
+
+  --cream: #0B1220;
+  --cream-2: #0E1726;
+  --ink: #E7EEF9;
+  --ink-2: #B4C2D8;
+  --ink-3: #8C9DB6;
+  --line: #22314A;
+  --line-2: #2C3E5C;
+  --card: #111C2E;
+  --blue: #5B9BFF;
+  --blue-soft: #16294A;
+  --shadow: 0 14px 38px rgba(0, 0, 0, .5);
+  --shadow-sm: 0 3px 10px rgba(0, 0, 0, .35);
+  color: var(--ai-text);
+  background:
+    radial-gradient(1100px 520px at 10% -10%, #16283F 0%, rgba(22, 40, 63, 0) 60%),
+    radial-gradient(900px 420px at 95% 0%, #1B2340 0%, rgba(27, 35, 64, 0) 55%),
+    var(--ai-bg);
+}
+
+/* 헤더 · 모드 바 */
+body[data-mode="ai"] .brand-badge {
+  background: #0F1A2B;
+  border-color: #2C3E5C;
+  box-shadow: 0 0 0 1px rgba(91, 155, 255, .12), 0 6px 18px rgba(0, 0, 0, .45);
+}
+body[data-mode="ai"] .brand-badge .ico-family { display: none; }
+body[data-mode="ai"] .brand-badge .ico-ai { display: block; }
+body[data-mode="ai"] .brand-text strong { color: #F2F7FF; }
+body[data-mode="ai"] .brand-text small { color: #6D8CB8; letter-spacing: .18em; }
+body[data-mode="ai"] .sync-chip { background: #0F1A2B; border-color: #2C3E5C; color: #9FB2CC; }
+body[data-mode="ai"] .sync-chip[data-state="online"] { background: #0C2318; border-color: #1E5A3C; color: #6EE7A8; }
+body[data-mode="ai"] .sync-chip[data-state="error"] { background: #2A1113; border-color: #7F2A2D; color: #FCA5A5; }
+body[data-mode="ai"] .mode-bar { background: rgba(13, 22, 36, .92); border-color: #26364F; }
+body[data-mode="ai"] .mode-btn { color: #7C8CA6; }
+body[data-mode="ai"] .mode-btn:hover { color: #B4C2D8; }
+body[data-mode="ai"] .mode-btn.is-active { background: #1B2C46; color: #EAF2FF; box-shadow: 0 2px 8px rgba(0, 0, 0, .45); }
+body[data-mode="ai"] .mode-btn.has-room::after { box-shadow: 0 0 0 2px #0D1624; }
+
+/* 패널 · 하단 독 */
+body[data-mode="ai"] .panel {
+  border-color: #22314A;
+  background: var(--ai-panel);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(96, 165, 250, .07);
+}
+body[data-mode="ai"] .panel-head h2 { color: #EEF4FF; }
+body[data-mode="ai"] .panel-sub { color: #7C8CA6; }
+body[data-mode="ai"] .dock {
+  background: rgba(12, 20, 34, .92);
+  border-color: #26364F;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .6), 0 2px 6px rgba(0, 0, 0, .4);
+}
+body[data-mode="ai"] .dock-btn { color: #74869F; }
+body[data-mode="ai"] .dock-btn.is-active { background: #FFD84D; color: #3D2C00; box-shadow: 0 3px 0 #B88F00; }
+body[data-mode="ai"] .dock-badge { background: #2563EB; color: #fff; box-shadow: 0 0 0 2px #0C1422; }
+body[data-mode="ai"] .dock-btn.is-active .dock-badge { background: #3D2C00; color: #FFD84D; }
+
+/* 사단 에이전트 카드 */
+body[data-mode="ai"] .attend-item { background: #0F1A2B; border-color: #22314A; }
+body[data-mode="ai"] .attend-item.is-target { background: #10203A; border-color: #2F6BFF; box-shadow: inset 0 0 0 1px #2C4B80; }
+body[data-mode="ai"] .attend-item.is-target .attend-name { color: #9CC0FF; }
+body[data-mode="ai"] .attend-pick:hover { background: #14223A; }
+body[data-mode="ai"] .attend-face { background: #0B1220; border-color: #2C3E5C; }
+body[data-mode="ai"] .attend-role,
+body[data-mode="ai"] .attend-hint { color: #8C9DB6; }
+body[data-mode="ai"] .attend-del { color: #7C8CA6; }
+body[data-mode="ai"] .attend-del:hover { color: #FCA5A5; background: #2A1113; }
+body[data-mode="ai"] .agent-tag { background: #16294A; color: #9CC0FF; }
+body[data-mode="ai"] .status-dot { box-shadow: 0 0 0 2px #0F1A2B, 0 0 0 3px rgba(255, 255, 255, .1); }
+body[data-mode="ai"] .status-dot[data-status="online"] { box-shadow: 0 0 0 2px #0F1A2B, 0 0 0 3px rgba(22, 163, 74, .38); }
+body[data-mode="ai"] .status-dot[data-status="exhausted"] { box-shadow: 0 0 0 2px #0F1A2B, 0 0 0 3px rgba(249, 115, 22, .42); }
+body[data-mode="ai"] .status-dot[data-status="offline"] { box-shadow: 0 0 0 2px #0F1A2B, 0 0 0 3px rgba(220, 38, 38, .38); }
+body[data-mode="ai"] .status-select { background-color: #0B1220; border-color: #2C3E5C; color: #B4C2D8; }
+body[data-mode="ai"] .status-select[data-status="online"] { background-color: #0C2318; border-color: #1E5A3C; color: #6EE7A8; }
+body[data-mode="ai"] .status-select[data-status="working"] { background-color: #10233F; border-color: #254C86; color: #8AB4FF; }
+body[data-mode="ai"] .status-select[data-status="exhausted"] { background-color: #2E1D0C; border-color: #7A4A15; color: #FDBA74; }
+body[data-mode="ai"] .status-select[data-status="offline"] { background-color: #2A1113; border-color: #7F2A2D; color: #FCA5A5; }
+body[data-mode="ai"] .status-sum[data-status="online"] { color: #4ADE80; }
+body[data-mode="ai"] .status-sum[data-status="working"] { color: #60A5FA; }
+body[data-mode="ai"] .status-sum[data-status="exhausted"] { color: #FB923C; }
+body[data-mode="ai"] .status-sum[data-status="offline"] { color: #F87171; }
+
+/* 입력 · 필터 */
+body[data-mode="ai"] input[type="text"],
+body[data-mode="ai"] input[type="url"],
+body[data-mode="ai"] select { background: #0B1220; border-color: #2C3E5C; color: #E7EEF9; }
+body[data-mode="ai"] input::placeholder { color: #64748B; }
+body[data-mode="ai"] input:focus,
+body[data-mode="ai"] select:focus { background: #0E1A2C; border-color: #5B9BFF; box-shadow: 0 0 0 3px rgba(91, 155, 255, .18); }
+body[data-mode="ai"] .chip-btn { background: #0F1A2B; border-color: #2C3E5C; color: #9FB2CC; }
+body[data-mode="ai"] .chip-btn:hover { border-color: #3D5273; }
+body[data-mode="ai"] .chip-btn.is-active { background: #16294A; border-color: #2C4B80; color: #9CC0FF; }
+
+/* 일감 큐 */
+body[data-mode="ai"] .item { background: #0F1A2B; border-color: #22314A; }
+body[data-mode="ai"] .item.is-done { background: #0C1524; }
+body[data-mode="ai"] .item-check { background: #0B1220; border-color: #3A4C69; }
+body[data-mode="ai"] .item-check:checked { background: #1FBF7A; border-color: #1FBF7A; }
+body[data-mode="ai"] .tag-agenda { background: #16294A; color: #9CC0FF; }
+body[data-mode="ai"] .tag-todo { background: #2E2410; color: #F5CF6B; }
+body[data-mode="ai"] .item-del { color: #7C8CA6; }
+body[data-mode="ai"] .item-del:hover { color: #FCA5A5; background: #2A1113; }
+body[data-mode="ai"] .owner-badge { background: #0B1220; border-color: #2C3E5C; color: #B4C2D8; }
+body[data-mode="ai"] .queue-head { color: #7C8CA6; }
+body[data-mode="ai"] .queue-head-count { background: #16233A; color: #B4C2D8; }
+body[data-mode="ai"] .empty { background: #0D1726; border-color: #26364F; color: #8C9DB6; }
+body[data-mode="ai"] .item-form { border-top-color: #26364F; }
+
+/* 오더 · 보고 채팅 */
+body[data-mode="ai"] .chat-feed {
+  border-color: #22314A;
+  background:
+    radial-gradient(620px 220px at 50% 0%, #14243C 0%, rgba(20, 36, 60, 0) 72%),
+    #0A1422;
+}
+body[data-mode="ai"] .chat-day { background: #16233A; border-color: #2C3E5C; color: #8FA2BE; }
+body[data-mode="ai"] .msg-av { background: #0B1220; border-color: #2C3E5C; }
+body[data-mode="ai"] .msg-name { color: #9FB2CC; }
+body[data-mode="ai"] .msg-time { color: #6B7C96; }
+body[data-mode="ai"] .msg-bubble { background: var(--ai-bubble); border-color: #2C3E5C; color: #E7EEF9; }
+body[data-mode="ai"] .msg:not(.is-me) .msg-bubble::after { background: var(--ai-bubble); border-color: #2C3E5C; }
+body[data-mode="ai"] .msg.is-self .msg-bubble { background: #FFD84D; border-color: #D9A800; color: #3D2C00; box-shadow: 0 3px 10px rgba(224, 168, 0, .25); }
+body[data-mode="ai"] .msg.is-self .msg-bubble::after { background: #FFD84D; border-color: #D9A800; }
+body[data-mode="ai"] .msg.is-jubot .msg-bubble { background: #14284B; border-color: #2C4B80; color: #DCE8FF; }
+body[data-mode="ai"] .msg.is-jubot .msg-bubble::after { background: #14284B; border-color: #2C4B80; }
+body[data-mode="ai"] .msg.is-jubot .msg-name { color: #9CC0FF; }
+body[data-mode="ai"] .msg-typing .msg-bubble { background: #101B2C; border-color: #3D5273; }
+body[data-mode="ai"] .typing-dots i { background: #8FA2BE; }
+body[data-mode="ai"] .typing-text { color: #8FA2BE; }
+body[data-mode="ai"] .chat-form { border-top-color: #26364F; }
+body[data-mode="ai"] .chat-form.is-targeted input { border-color: #2C4B80; background: #0E1B2E; }
+body[data-mode="ai"] .target-label { color: #7C8CA6; }
+body[data-mode="ai"] .target-chip { background: #0F1A2B; border-color: #2C3E5C; color: #B4C2D8; }
+body[data-mode="ai"] .target-chip:hover { border-color: #3D5273; }
+body[data-mode="ai"] .target-chip.is-active { background: #2F6BFF; border-color: #5B9BFF; color: #fff; box-shadow: 0 3px 0 #1B47B8; }
+body[data-mode="ai"] .target-state { background: #16233A; color: #9FB2CC; }
+body[data-mode="ai"] .target-state[data-status="working"] { background: #10233F; color: #8AB4FF; }
+body[data-mode="ai"] .target-state[data-status="exhausted"] { background: #2E1D0C; color: #FDBA74; }
+body[data-mode="ai"] .target-state[data-status="offline"] { background: #2A1113; color: #FCA5A5; }
+body[data-mode="ai"] .mention-badge { background: #16294A; border-color: #2C4B80; color: #9CC0FF; }
+
+/* 설정 */
+body[data-mode="ai"] .setting-card { background: #0F1A2B; border-color: #22314A; }
+body[data-mode="ai"] .setting-card h3 { color: #B4C2D8; }
+body[data-mode="ai"] .setting-note { color: #8C9DB6; }
+body[data-mode="ai"] .setting-state { color: #E7EEF9; }
+body[data-mode="ai"] .setting-state[data-state="ai"] { color: #9CC0FF; }
+body[data-mode="ai"] .setting-state[data-state="ai"] .dot { background: #5B9BFF; }
+body[data-mode="ai"] .setting-state[data-state="online"] { color: #6EE7A8; }
+body[data-mode="ai"] .setting-state[data-state="online"] .dot { background: #34D399; }
+body[data-mode="ai"] .setting-state[data-state="error"] { color: #FCA5A5; }
+body[data-mode="ai"] .setting-state[data-state="error"] .dot { background: #F87171; }
+body[data-mode="ai"] .room-chip { background: #0F1A2B; border-color: #2C3E5C; }
+body[data-mode="ai"] .room-chip[data-kind="ai"] { background: #0C1A2E; border-color: #2C4B80; }
+body[data-mode="ai"] .room-chip[data-kind="ai"] .room-chip-label,
+body[data-mode="ai"] .room-chip[data-kind="ai"] .room-chip-name { color: #9CC0FF; }
+body[data-mode="ai"] .btn-ghost { background: #0F1A2B; border-color: #2C3E5C; color: #B4C2D8; }
+body[data-mode="ai"] .btn-ghost:hover { border-color: #3D5273; color: #E7EEF9; }
+
+/* 접속 정보 입력창 */
+body[data-mode="ai"] .dialog { background: #111C2E; color: #E7EEF9; }
+body[data-mode="ai"] .dialog::backdrop { background: rgba(4, 8, 16, .66); }
+body[data-mode="ai"] .dialog-lead { color: #B4C2D8; }
+body[data-mode="ai"] .field > span { color: #B4C2D8; }
+body[data-mode="ai"] .dialog-status { color: #8C9DB6; }
+
+@media (max-width: 420px) {
+  .ai-summary { padding: 8px 9px; }
+  .ai-stat b { font-size: 15px; }
+  .ai-stat span { font-size: 9px; }
+  .mode-btn { padding: 6px 10px; font-size: 12px; }
 }

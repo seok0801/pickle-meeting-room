@@ -4,10 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>피클 합동 회의실 · Pickle Meeting Room</title>
-<meta name="description" content="귀여운 피클들이 함께 모여 회의하는 합동 회의실. 출석 보드, 회의 안건·할 일, 실시간 말풍선 채팅방.">
+<meta name="description" content="귀여운 피클들이 함께 모여 회의하는 합동 회의실. 출석 보드, 회의 안건·할 일, 실시간 말풍선 채팅방. AI 사단 통합 관제실 모드 포함.">
 <meta name="theme-color" content="#FFD84D">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css?v=20261128q">
+<link rel="stylesheet" href="styles.css?v=20261128r">
+<script>
+/* 화면 검증용 최소 오류 기록 — 오류 메시지만 html[data-js-errors]에 모읍니다(데이터·비밀값 없음). */
+(function () {
+  var d = document.documentElement;
+  function note(m) { d.dataset.jsErrors = ((d.dataset.jsErrors || '') + String(m).slice(0, 120) + ' | ').slice(0, 400); }
+  window.addEventListener('error', function (e) { note(e.message || 'error'); });
+  window.addEventListener('unhandledrejection', function (e) { note('rejection: ' + ((e.reason && e.reason.message) || e.reason)); });
+})();
+</script>
 </head>
 <body>
 <!-- ============ 초대 전용 잠금 화면 ============ -->
@@ -42,11 +51,12 @@
   <header class="topbar">
     <div class="brand">
       <span class="brand-badge" aria-hidden="true">
-        <svg viewBox="0 0 100 104"><ellipse cx="22" cy="26" rx="12" ry="12" fill="#2F6BFF"/><ellipse cx="78" cy="26" rx="12" ry="12" fill="#2F6BFF"/><rect x="14" y="28" width="72" height="64" rx="30" fill="#FFD84D" stroke="#2F6BFF" stroke-width="5"/><ellipse cx="38" cy="60" rx="5" ry="6.5" fill="#2A2418"/><ellipse cx="62" cy="60" rx="5" ry="6.5" fill="#2A2418"/><path d="M44 76 q6 6 12 0" stroke="#2A2418" stroke-width="3" fill="none" stroke-linecap="round"/></svg>
+        <svg class="ico-family" viewBox="0 0 100 104"><ellipse cx="22" cy="26" rx="12" ry="12" fill="#2F6BFF"/><ellipse cx="78" cy="26" rx="12" ry="12" fill="#2F6BFF"/><rect x="14" y="28" width="72" height="64" rx="30" fill="#FFD84D" stroke="#2F6BFF" stroke-width="5"/><ellipse cx="38" cy="60" rx="5" ry="6.5" fill="#2A2418"/><ellipse cx="62" cy="60" rx="5" ry="6.5" fill="#2A2418"/><path d="M44 76 q6 6 12 0" stroke="#2A2418" stroke-width="3" fill="none" stroke-linecap="round"/></svg>
+        <svg class="ico-ai" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6" fill="none" stroke="#5B9BFF" stroke-width="2"/><path d="M15.7 8.3 13.3 13.3 8.3 15.7 10.7 10.7Z" fill="#FFD84D" stroke="#FFD84D" stroke-width="1.1" stroke-linejoin="round"/><circle cx="12" cy="12" r="1.35" fill="#0B1220"/></svg>
       </span>
       <span class="brand-text">
-        <strong>피클 합동 회의실</strong>
-        <small>Pickle Meeting Room</small>
+        <strong id="brandTitle">피클 합동 회의실</strong>
+        <small id="brandSub">Pickle Meeting Room</small>
       </span>
     </div>
 
@@ -54,6 +64,33 @@
       <span class="dot" aria-hidden="true"></span><span id="syncChipText">연결 중</span>
     </span>
   </header>
+
+  <!-- ============ 모드 바: 가족 회의실 ↔ 🧭 AI 사단 관제실 ============ -->
+  <div class="mode-bar" id="modeBar" role="group" aria-label="회의실 모드 전환">
+    <button type="button" class="mode-btn" data-mode="family" aria-pressed="true" title="가족 회의실로 전환">
+      <span class="mode-emoji" aria-hidden="true">🏠</span><span>가족 회의실</span>
+    </button>
+    <button type="button" class="mode-btn" data-mode="ai" aria-pressed="false" title="AI 사단 통합 관제실로 전환">
+      <span class="mode-emoji" aria-hidden="true">🧭</span><span>관제실</span>
+    </button>
+  </div>
+
+  <!-- ============ AI 관제실 요약 (관제실 모드에서만) ============ -->
+  <div class="ai-summary" id="aiSummary" hidden aria-label="사단 현황 요약">
+    <div class="ai-sum-head">
+      <span class="ai-sum-title">사단 현황</span>
+      <span class="ai-sse" id="aiSse" data-state="local" title="실시간 스트림 상태">
+        <span class="dot" aria-hidden="true"></span><span id="aiSseText">SSE 연결 중</span>
+      </span>
+    </div>
+    <div class="ai-sum-grid">
+      <div class="ai-stat" data-stat="online" title="접속 중인 에이전트"><b id="statOnline">0</b><span>접속</span></div>
+      <div class="ai-stat" data-stat="working" title="작업 중인 에이전트"><b id="statWorking">0</b><span>작업중</span></div>
+      <div class="ai-stat" data-stat="exhausted" title="한도 소진 에이전트"><b id="statExhausted">0</b><span>한도소진</span></div>
+      <div class="ai-stat" data-stat="offline" title="중단(접속 끊김) 에이전트"><b id="statOffline">0</b><span>중단</span></div>
+      <div class="ai-stat" data-stat="open" title="미완료 일감"><b id="statOpen">0</b><span>미완료 일감</span></div>
+    </div>
+  </div>
 
   <main class="view" id="view">
 
@@ -80,7 +117,7 @@
       </form>
     </section>
 
-    <!-- ============ 안건 / 공동 할 일 ============ -->
+    <!-- ============ 안건 / 일감 큐 ============ -->
     <section class="panel panel-agenda" id="panelAgenda" data-panel="agenda" aria-labelledby="agendaTitle">
       <div class="panel-head">
         <h2 id="agendaTitle">회의 안건 &amp; 공동 할 일</h2>
@@ -115,7 +152,7 @@
       </form>
     </section>
 
-    <!-- ============ 참가자 (출석 피클) ============ -->
+    <!-- ============ 참가자 (출석 피클 / 사단 에이전트) ============ -->
     <section class="panel panel-attend" id="panelAttend" data-panel="attend" aria-labelledby="attendTitle">
       <div class="panel-head">
         <h2 id="attendTitle">접속자 · 출석 피클</h2>
@@ -142,6 +179,18 @@
 
       <div class="settings-stack">
         <section class="setting-card">
+          <h3>회의실 모드</h3>
+          <p class="setting-state" id="modeState" data-state="family">
+            <span class="dot" aria-hidden="true"></span><strong id="modeStateText">가족 회의실 모드</strong>
+          </p>
+          <div class="setting-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="btnSetupFamily">🏠 가족 회의실 접속 정보</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btnSetupAi">🧭 관제실 접속 정보</button>
+          </div>
+          <p class="setting-note">방 ID·초대 키는 이 기기 브라우저(localStorage)에 모드별로 따로 저장됩니다. 두 방을 한 번씩 저장해 두면 위 모드 바에서 한 번 눌러 바로 전환됩니다.</p>
+        </section>
+
+        <section class="setting-card">
           <h3>초대 전용 회의실</h3>
           <div class="room-chip" id="roomChip" data-kind="private">
             <span class="room-chip-label" id="roomChipLabel">초대 전용</span>
@@ -167,7 +216,7 @@
           <p class="setting-state" id="syncState" data-state="local">
             <span class="dot" aria-hidden="true"></span><strong id="syncStateText">연결 중</strong>
           </p>
-          <p class="setting-note">같은 초대 링크로 들어온 기기·피클끼리 메시지와 안건이 바로 공유됩니다.</p>
+          <p class="setting-note">같은 초대 링크로 들어온 기기·피클끼리 메시지와 일감이 바로 공유됩니다.</p>
         </section>
 
         <section class="setting-card">
@@ -187,27 +236,48 @@
   <nav class="dock" aria-label="화면 전환">
     <button type="button" class="dock-btn is-active" data-tab="chat" aria-controls="panelChat" aria-pressed="true">
       <span class="dock-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 11.6a7.6 7.6 0 0 1-7.6 7.6H8.4l-4.1 3v-4.5A7.6 7.6 0 1 1 20 11.6Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg></span>
-      <span class="dock-label">채팅</span>
+      <span class="dock-label" data-family="채팅" data-ai="오더">채팅</span>
     </button>
     <button type="button" class="dock-btn" data-tab="agenda" aria-controls="panelAgenda" aria-pressed="false">
       <span class="dock-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4.5" y="4" width="15" height="16.5" rx="3.2" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M8.4 8.6h7.2M8.4 12.4h7.2M8.4 16.2h4.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
-      <span class="dock-label">안건</span>
+      <span class="dock-label" data-family="안건" data-ai="일감">안건</span>
       <span class="dock-badge" id="badgeAgenda" hidden>0</span>
     </button>
     <button type="button" class="dock-btn" data-tab="attend" aria-controls="panelAttend" aria-pressed="false">
       <span class="dock-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9.2" cy="8.6" r="3.3" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M3.4 19.4c0-3.2 2.6-5.4 5.8-5.4s5.8 2.2 5.8 5.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M16.2 5.9a3.3 3.3 0 0 1 0 6.2M17.6 14.4c2.1.6 3.5 2.4 3.5 5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
-      <span class="dock-label">참가자</span>
+      <span class="dock-label" data-family="참가자" data-ai="사단">참가자</span>
       <span class="dock-badge" id="badgeAttend" hidden>0</span>
     </button>
     <button type="button" class="dock-btn" data-tab="settings" aria-controls="panelSettings" aria-pressed="false">
       <span class="dock-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l1.9-1.5-2-3.4-2.3 1a7.6 7.6 0 0 0-1.7-1L15 3.4h-4l-.3 2.7a7.6 7.6 0 0 0-1.7 1l-2.3-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-1.9 1.5 2 3.4 2.3-1a7.6 7.6 0 0 0 1.7 1l.3 2.7h4l.3-2.7a7.6 7.6 0 0 0 1.7-1l2.3 1 2-3.4Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></span>
-      <span class="dock-label">설정</span>
+      <span class="dock-label" data-family="설정" data-ai="설정">설정</span>
     </button>
   </nav>
 
 
 </div>
 
-<script src="app.js?v=20261128q"></script>
+<!-- ============ 관제실/가족방 접속 정보 입력 ============ -->
+<dialog class="dialog" id="modeDialog" aria-labelledby="modeDialogTitle">
+  <form class="dialog-body" id="formModeDialog" autocomplete="off">
+    <h2 id="modeDialogTitle">🧭 AI 사단 통합 관제실 접속</h2>
+    <p class="dialog-lead" id="modeDialogLead">관제실 방 ID와 초대 키를 입력하면 이 기기에 저장하고 바로 전환합니다.</p>
+    <label class="field">
+      <span>방 ID</span>
+      <input id="modeRoom" type="text" maxlength="40" placeholder="ai_..." spellcheck="false" autocapitalize="off" required>
+    </label>
+    <label class="field">
+      <span>초대 키</span>
+      <input id="modeKey" type="password" maxlength="64" placeholder="inv_..." spellcheck="false" autocapitalize="off" required>
+    </label>
+    <p class="dialog-status" id="modeDialogStatus" role="status"></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-ghost" id="btnModeCancel">취소</button>
+      <button type="submit" class="btn btn-primary" id="btnModeConnect">저장하고 전환</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="app.js?v=20261128r"></script>
 </body>
 </html>

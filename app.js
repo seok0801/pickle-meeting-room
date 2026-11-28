@@ -36,6 +36,39 @@
   // 방(ID) + 초대 키마다 localStorage를 따로 써서, 방의 내용이 다른 방으로 새지 않게 합니다.
   function stateKey() { return KEY_HEAD + '/room/' + INVITE.room + '/' + INVITE.key; }
 
+  /* ------------------------------ 모드: 가족 회의실 ↔ AI 사단 관제실 ------------------------------ */
+
+  // 방 ID가 ai_로 시작하면 AI 사단 관제실 모드, 그 밖(rm_ 등)은 가족 회의실 모드입니다.
+  function modeOfRoom(room) { return /^ai[_-]/i.test(String(room || '')) ? 'ai' : 'family'; }
+
+  // 두 방의 접속 정보를 모드별로 따로 기억합니다(같은 기기·브라우저의 localStorage에만).
+  var BOOKMARKS_KEY = 'pickle-meeting-room/rooms';
+  var MODE_KEY = 'pickle-meeting-room/mode';
+
+  function loadBookmarks() {
+    var out = { family: null, ai: null };
+    try {
+      var parsed = JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || 'null');
+      ['family', 'ai'].forEach(function (m) {
+        var v = parsed && parsed[m];
+        if (!v) return;
+        var room = sanitizeRoom(v.room);
+        var key = sanitizeKey(v.key);
+        if (room && key.length >= MIN_KEY_LEN) out[m] = { room: room, key: key };
+      });
+    } catch (e) { /* 손상된 값은 무시하고 새로 저장합니다 */ }
+    return out;
+  }
+
+  function saveBookmark(mode, room, key) {
+    BOOKMARKS[mode === 'ai' ? 'ai' : 'family'] = { room: room, key: key };
+    try { localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(BOOKMARKS)); } catch (e) { /* 저장 실패 무시 */ }
+  }
+
+  var BOOKMARKS = loadBookmarks();
+  var CURRENT_MODE = 'family';
+  function isAi() { return CURRENT_MODE === 'ai'; }
+
   function inviteUrl(room, key) {
     return window.location.origin + window.location.pathname +
       '?room=' + encodeURIComponent(room) + '&key=' + encodeURIComponent(key);
@@ -79,14 +112,26 @@
     return (prefix || 'id') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
   }
 
-  // 초대받은 방의 초기 상태 — 데모 샘플을 넣지 않고 주봇만 앉혀 둡니다.
+  // 관제실 새 방이 비어 있을 때 앉혀 두는 사단 5개 에이전트 — 주봇(총괄) + PC1·PC2.
+  var AI_SEED = [
+    { id: 'p-jubot', name: '주봇', role: '총괄 지시자', color: 0, status: 'online' },
+    { id: 'p-claude-pc1', name: '클로드PC1', role: 'PC1 홈피·DB', color: 3, status: 'online' },
+    { id: 'p-codex-pc1', name: '코덱스PC1', role: 'PC1 크롤러·OCR', color: 4, status: 'online' },
+    { id: 'p-claude-pc2', name: '클로드PC2', role: 'PC2 개발·시각화', color: 1, status: 'online' },
+    { id: 'p-codex-pc2', name: '코덱스PC2', role: 'PC2 관제·자동화', color: 2, status: 'online' }
+  ];
+
+  // 초대받은 방의 초기 상태 — 데모 샘플 없이 주봇(가족) 또는 사단 5개 에이전트(관제실)만 앉혀 둡니다.
   function blankState() {
+    var seed = modeOfRoom(INVITE.room) === 'ai' ? AI_SEED : [
+      { id: 'p-jubot', name: '주봇', role: '회의 진행', color: 0, status: 'online' }
+    ];
     return {
       version: 1,
       updatedAt: Date.now(),
-      pickles: [
-        { id: 'p-jubot', name: '주봇', role: '회의 진행', color: 0, status: 'online' }
-      ],
+      pickles: seed.map(function (p) {
+        return { id: p.id, name: p.name, role: p.role, color: p.color, status: p.status };
+      }),
       items: [],
       timeline: []
     };
@@ -106,6 +151,19 @@
     }
   }
 
+  // RTDB는 배열을 객체(키 "0"·"1"…)로 돌려주기도 하므로, 배열이든 객체든 같은 목록으로 읽습니다.
+  function asList(v) {
+    if (Array.isArray(v)) return v;
+    if (!v || typeof v !== 'object') return [];
+    return Object.keys(v).sort(function (a, b) {
+      var na = /^\d+$/.test(a), nb = /^\d+$/.test(b);
+      if (na && nb) return Number(a) - Number(b);
+      if (na) return -1;
+      if (nb) return 1;
+      return a < b ? -1 : a > b ? 1 : 0;
+    }).map(function (k) { return v[k]; });
+  }
+
   function normalize(s) {
     if (!s || typeof s !== 'object') return null;
     var out = {
@@ -115,7 +173,7 @@
       items: [],
       timeline: []
     };
-    (Array.isArray(s.pickles) ? s.pickles : []).forEach(function (p, i) {
+    asList(s.pickles).forEach(function (p, i) {
       if (!p || typeof p.name !== 'string' || !p.name.trim()) return;
       out.pickles.push({
         id: String(p.id || uid('p')),
@@ -125,7 +183,7 @@
         status: normalizeStatus(p.status)
       });
     });
-    (Array.isArray(s.items) ? s.items : []).forEach(function (it) {
+    asList(s.items).forEach(function (it) {
       if (!it || typeof it.title !== 'string' || !it.title.trim()) return;
       out.items.push({
         id: String(it.id || uid('i')),
@@ -136,7 +194,7 @@
         ts: Number(it.ts) || Date.now()
       });
     });
-    (Array.isArray(s.timeline) ? s.timeline : []).forEach(function (m) {
+    asList(s.timeline).forEach(function (m) {
       if (!m || typeof m.text !== 'string' || !m.text.trim()) return;
       out.timeline.push({
         id: String(m.id || uid('t')),
@@ -232,6 +290,10 @@
       dot.setAttribute('aria-hidden', 'true');
       nameRow.appendChild(dot);
       nameRow.appendChild(el('span', 'attend-name', p.name));
+      if (isAi()) {
+        var grp = agentGroup(p);
+        if (grp) nameRow.appendChild(el('span', 'agent-tag', grp));
+      }
       var rl = el('div', 'attend-role', p.role || '합류한 피클');
       meta.appendChild(nameRow);
       meta.appendChild(rl);
@@ -293,10 +355,18 @@
     renderTargetState();
   }
 
+  // 관제실 카드에 붙는 소속 태그 — 클로드PC1·코덱스PC1은 PC1, PC2는 PC2, 주봇은 총괄.
+  function agentGroup(p) {
+    if (/PC1/i.test(p.name)) return 'PC1';
+    if (/PC2/i.test(p.name)) return 'PC2';
+    if (p.name === '주봇') return '총괄';
+    return '';
+  }
+
   // 상단 요약 — "2마리 참석 · 접속 2" 처럼 상태별 인원을 표시합니다.
   function renderAttendSummary() {
     var n = state.pickles.length;
-    attendCount.textContent = n + '마리 참석';
+    attendCount.textContent = isAi() ? n + '개 에이전트' : n + '마리 참석';
     var box = $('#attendStatus');
     if (!box) return;
     box.textContent = '';
@@ -310,9 +380,27 @@
       seg.dataset.status = s;
       seg.appendChild(el('i', 'status-sum-dot'));
       seg.appendChild(document.createTextNode(statusLabel(s) + ' ' + c));
-      seg.title = statusLabel(s) + ' ' + c + '마리';
+      seg.title = statusLabel(s) + ' ' + c + (isAi() ? '개' : '마리');
       box.appendChild(seg);
     });
+    renderAiSummary();
+  }
+
+  // 관제실 상단 요약 배지 — 접속 · 작업중 · 한도소진 · 중단(접속 끊김) · 미완료 일감.
+  function renderAiSummary() {
+    if (!isAi()) return;
+    var counts = { online: 0, working: 0, exhausted: 0, offline: 0 };
+    state.pickles.forEach(function (p) { counts[normalizeStatus(p.status)] += 1; });
+    setText('#statOnline', counts.online);
+    setText('#statWorking', counts.working);
+    setText('#statExhausted', counts.exhausted);
+    setText('#statOffline', counts.offline);
+    setText('#statOpen', state.items.filter(function (it) { return !it.done; }).length);
+  }
+
+  function setText(sel, value) {
+    var n = $(sel);
+    if (n) n.textContent = String(value);
   }
 
   /* ------------------------------ 안건 / 할 일 ------------------------------ */
@@ -347,58 +435,106 @@
     });
   }
 
+  function buildItemRow(it) {
+    var li = el('li', 'item' + (it.done ? ' is-done' : ''));
+    li.dataset.id = it.id;
+
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'item-check';
+    cb.checked = it.done;
+    cb.setAttribute('aria-label', it.title + ' 완료');
+    cb.addEventListener('change', function () {
+      it.done = cb.checked;
+      react(null, (cb.checked ? '완료! ' : '다시 진행할게요. ') + '“' + short(it.title) + '”');
+      save();
+      renderItems();
+      renderChat();
+    });
+
+    var body = el('div', 'item-body');
+    var title = el('div', 'item-title', it.title);
+    var meta = el('div', 'item-meta');
+    var tagText = it.type === 'todo' ? '할 일' : (isAi() ? '일감' : '안건');
+    var tag = el('span', 'tag ' + (it.type === 'todo' ? 'tag-todo' : 'tag-agenda'), tagText);
+    meta.appendChild(tag);
+
+    var owner = it.owner && pickleNameById(it.owner) ? it.owner : (it.owner || '담당 미정');
+    if (isAi() && it.owner) {
+      // 담당자 배지 — 그 에이전트의 현재 상태 색 점을 함께 보여 줍니다.
+      var ob = el('span', 'owner-badge');
+      var op = pickleNameById(it.owner);
+      if (op) {
+        ob.dataset.status = op.status;
+        ob.appendChild(el('i', 'owner-dot'));
+        ob.appendChild(document.createTextNode(owner));
+      } else {
+        ob.textContent = owner;
+      }
+      meta.appendChild(ob);
+    } else {
+      meta.appendChild(el('span', null, owner));
+    }
+    meta.appendChild(el('span', null, fmtTime(it.ts)));
+    body.appendChild(title);
+    body.appendChild(meta);
+
+    var del = el('button', 'item-del', '×');
+    del.type = 'button';
+    del.setAttribute('aria-label', it.title + ' 삭제');
+    del.addEventListener('click', function () {
+      state.items = state.items.filter(function (x) { return x.id !== it.id; });
+      save();
+      renderItems();
+    });
+
+    li.appendChild(cb);
+    li.appendChild(body);
+    li.appendChild(del);
+    return li;
+  }
+
+  // 관제실 일감 큐의 구분 줄 — 미완료 일감 / 완료 일감.
+  function queueHead(label, n, kind) {
+    var li = el('li', 'queue-head');
+    li.dataset.kind = kind;
+    li.appendChild(el('span', 'queue-head-label', label));
+    li.appendChild(el('span', 'queue-head-count', String(n)));
+    return li;
+  }
+
   function renderItems() {
     itemList.textContent = '';
     var list = visibleItems();
-    list.forEach(function (it) {
-      var li = el('li', 'item' + (it.done ? ' is-done' : ''));
-      li.dataset.id = it.id;
 
-      var cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.className = 'item-check';
-      cb.checked = it.done;
-      cb.setAttribute('aria-label', it.title + ' 완료');
-      cb.addEventListener('change', function () {
-        it.done = cb.checked;
-        react(null, (cb.checked ? '완료! ' : '다시 진행할게요. ') + '“' + short(it.title) + '”');
-        save();
-        renderItems();
-        renderChat();
-      });
-
-      var body = el('div', 'item-body');
-      var title = el('div', 'item-title', it.title);
-      var meta = el('div', 'item-meta');
-      var tag = el('span', 'tag ' + (it.type === 'todo' ? 'tag-todo' : 'tag-agenda'),
-        it.type === 'todo' ? '할 일' : '안건');
-      meta.appendChild(tag);
-      var owner = it.owner && pickleNameById(it.owner) ? it.owner : (it.owner || '담당 미정');
-      meta.appendChild(el('span', null, owner));
-      meta.appendChild(el('span', null, fmtTime(it.ts)));
-      body.appendChild(title);
-      body.appendChild(meta);
-
-      var del = el('button', 'item-del', '×');
-      del.type = 'button';
-      del.setAttribute('aria-label', it.title + ' 삭제');
-      del.addEventListener('click', function () {
-        state.items = state.items.filter(function (x) { return x.id !== it.id; });
-        save();
-        renderItems();
-      });
-
-      li.appendChild(cb);
-      li.appendChild(body);
-      li.appendChild(del);
-      itemList.appendChild(li);
-    });
+    if (isAi()) {
+      // 일감 큐: 미완료를 먼저, 완료를 아래에 나눠서 보여 줍니다.
+      var open = list.filter(function (it) { return !it.done; });
+      var done = list.filter(function (it) { return it.done; });
+      if (open.length) {
+        itemList.appendChild(queueHead('미완료 일감', open.length, 'open'));
+        open.forEach(function (it) { itemList.appendChild(buildItemRow(it)); });
+      }
+      if (done.length) {
+        itemList.appendChild(queueHead('완료 일감', done.length, 'done'));
+        done.forEach(function (it) { itemList.appendChild(buildItemRow(it)); });
+      }
+    } else {
+      list.forEach(function (it) { itemList.appendChild(buildItemRow(it)); });
+    }
 
     itemEmpty.hidden = list.length > 0;
+    itemEmpty.textContent = isAi()
+      ? '아직 등록된 일감이 없어요. 새 일감을 등록해 보세요.'
+      : '아직 안건이 없어요. 첫 안건을 추가해 보세요.';
+
     var total = state.items.length;
-    var done = state.items.filter(function (it) { return it.done; }).length;
-    itemProgress.textContent = done + ' / ' + total + ' 완료';
+    var doneCount = state.items.filter(function (it) { return it.done; }).length;
+    itemProgress.textContent = isAi()
+      ? '미완료 ' + (total - doneCount) + ' · 완료 ' + doneCount + ' / ' + total
+      : doneCount + ' / ' + total + ' 완료';
     renderDockBadges();
+    renderAiSummary();
   }
 
   function short(t) { return t.length > 22 ? t.slice(0, 22) + '…' : t; }
@@ -517,8 +653,8 @@
     if (form) form.classList.toggle('is-targeted', !!targetName);
     if (input) {
       input.placeholder = targetName
-        ? targetName + '에게 보낼 메시지 입력...'
-        : '메시지를 입력하고 Enter';
+        ? targetName + (isAi() ? '에게 보낼 오더 입력...' : '에게 보낼 메시지 입력...')
+        : (isAi() ? '오더·보고를 입력하고 Enter' : '메시지를 입력하고 Enter');
     }
     var items = document.querySelectorAll('.attend-item');
     for (var i = 0; i < items.length; i++) {
@@ -864,7 +1000,7 @@
       return cfg.url + '/rooms/' + encodeURIComponent(cfg.room) + '/' + encodeURIComponent(cfg.key) + '.json';
     }
 
-    function chip(stateName, text) {
+    function chip(stateName, text, transport) {
       // 헤더에는 짧은 상태만, 설정 탭에는 자세한 상태를 보여 줍니다.
       var headText = { online: '실시간', connecting: '연결 중', error: '오프라인', local: '로컬' };
       var chipEl = $('#syncChip');
@@ -875,6 +1011,19 @@
       if (st) st.dataset.state = stateName;
       var stText = $('#syncStateText');
       if (stText) stText.textContent = text;
+
+      // 관제실 요약 배지의 SSE 상태 — 스트림인지 폴링 대체인지도 구분해 보여 줍니다.
+      var sse = $('#aiSse');
+      if (sse) {
+        sse.dataset.state = stateName;
+        var sseText = $('#aiSseText');
+        if (sseText) {
+          sseText.textContent = stateName === 'online'
+            ? (transport === 'poll' ? 'SSE 폴링 대체' : 'SSE 실시간')
+            : stateName === 'connecting' ? 'SSE 연결 중'
+              : stateName === 'error' ? 'SSE 오프라인' : 'SSE 로컬';
+        }
+      }
     }
 
     function stop() {
@@ -958,7 +1107,7 @@
         return;
       }
       if (!res.body) { startPolling(); return; }
-      chip('online', '실시간 동기화 중');
+      chip('online', '실시간 동기화 중', 'sse');
       var reader = res.body.getReader();
       var dec = new TextDecoder();
       var buf = '';
@@ -990,7 +1139,7 @@
           var data = await r.json();
           if (data) {
             applyRemote(data);
-            chip('online', '동기화 중(폴링)');
+            chip('online', '동기화 중(폴링)', 'poll');
           } else {
             push(true);
           }
@@ -1057,6 +1206,9 @@
     if (appRoot) appRoot.hidden = true;
     if (lockScreen) lockScreen.hidden = false;
     if (msg) setLockStatus(msg, kind || 'error');
+    // 관제실 초대(ai_...)로 들어온 경우에는 잠금 화면 제목도 관제실로 맞춥니다.
+    var lt = $('#lockTitle');
+    if (lt) lt.textContent = modeOfRoom(INVITE.room) === 'ai' ? 'AI 사단 통합 관제실' : '피클 합동 회의실';
     var r = $('#lockRoom');
     if (r && !r.value && INVITE.room) r.value = INVITE.room;
   }
@@ -1092,6 +1244,7 @@
     }
 
     var prev = { room: INVITE.room, key: INVITE.key };
+    var wasEntered = ENTERED;
     INVITE.room = room;
     INVITE.key = key;
     state = loadState();
@@ -1101,13 +1254,24 @@
       if (code) {
         INVITE.room = prev.room;
         INVITE.key = prev.key;
-        if (fromUrl) history.replaceState({}, '', window.location.pathname);
-        showLock(statusMessage(code), 'error');
+        state = prev.room ? loadState() : blankState();
+        if (wasEntered) {
+          // 보던 화면은 그대로 두고, 지금 방의 실시간 연결만 되살립니다.
+          if (prev.room && prev.key) Sync.enter(prev.room, prev.key, function () {});
+          renderAll();
+          openModeDialog(modeOfRoom(room), statusMessage(code) + ' 저장된 접속 정보를 확인해 주세요.');
+        } else {
+          if (fromUrl) history.replaceState({}, '', window.location.pathname);
+          showLock(statusMessage(code), 'error');
+        }
         return;
       }
+      // 입장 성공 — 모드별 접속 정보를 이 기기에 저장하고 화면 모드(가족/관제실)를 맞춥니다.
+      saveBookmark(modeOfRoom(room), room, key);
       if (!fromUrl) history.replaceState({}, '', inviteUrl(room, key));
       var k = $('#lockKey');
       if (k) k.value = '';
+      applyMode(modeOfRoom(room));
       showApp();
     });
   }
@@ -1159,10 +1323,11 @@
   function renderRoomChip() {
     var box = $('#roomChip');
     if (!box) return;
-    box.dataset.kind = 'private';
-    $('#roomChipLabel').textContent = '초대 전용';
+    var ai = isAi();
+    box.dataset.kind = ai ? 'ai' : 'private';
+    $('#roomChipLabel').textContent = ai ? 'AI 사단 관제실' : '초대 전용';
     $('#roomChipName').textContent = INVITE.room || '—';
-    box.title = '대장님의 초대 링크로만 들어올 수 있는 회의실 · ' + (INVITE.room || '');
+    box.title = (ai ? 'AI 사단 전용 관제실 · ' : '대장님의 초대 링크로만 들어올 수 있는 회의실 · ') + (INVITE.room || '');
   }
 
   function legacyCopy(text) {
@@ -1212,6 +1377,163 @@
   wireCopyButton('#btnCopyRoom', '#btnCopyRoomText',
     '링크만 복사', '링크 복사됨', shareUrl);
 
+  /* ------------------------------ 모드 전환 (가족 회의실 ↔ 🧭 AI 관제실) ------------------------------ */
+
+  // 모드별 문구 — 같은 화면(채팅·안건·참가자·설정)을 각 모드의 언어로 보여 줍니다.
+  var MODE_UI = {
+    family: {
+      brand: '피클 합동 회의실', brandSub: 'Pickle Meeting Room',
+      title: '피클 합동 회의실 · Pickle Meeting Room', themeColor: '#FFD84D',
+      chat: '회의 채팅방', agenda: '회의 안건 & 공동 할 일',
+      attend: '접속자 · 출석 피클', settings: '회의실 설정',
+      attendHint: '카드를 누르면 그 피클이 채팅 대상으로 지정됩니다.',
+      itemPh: '안건 또는 할 일을 입력', picklePh: '새 피클 이름',
+      empty: '아직 메시지가 없어요. 첫 메시지를 보내 보세요.'
+    },
+    ai: {
+      brand: '🧭 AI 사단 통합 관제실', brandSub: 'AI COMMAND CENTER',
+      title: '🧭 AI 사단 통합 관제실 · AI COMMAND CENTER', themeColor: '#0B1220',
+      chat: '실시간 오더 · 보고', agenda: '일감 큐',
+      attend: '사단 에이전트 상태판', settings: '관제실 설정',
+      attendHint: '카드를 누르면 그 에이전트가 지시 대상이 됩니다.',
+      itemPh: '새 일감을 입력 (예: 팩트필 배포 점검)', picklePh: '새 에이전트 이름',
+      empty: '아직 오더·보고가 없습니다. 첫 지시를 보내 보세요.'
+    }
+  };
+
+  function setModeBar() {
+    Array.prototype.forEach.call(document.querySelectorAll('.mode-btn'), function (b) {
+      var mode = b.dataset.mode;
+      var on = mode === CURRENT_MODE;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.classList.toggle('has-room', !!BOOKMARKS[mode]);
+    });
+  }
+
+  // 화면 전체(헤더·요약 배지·탭 이름·문구·테마)를 모드에 맞게 바꿉니다.
+  function applyMode(mode) {
+    CURRENT_MODE = mode === 'ai' ? 'ai' : 'family';
+    var ui = MODE_UI[CURRENT_MODE];
+    document.body.dataset.mode = CURRENT_MODE;
+
+    var bt = $('#brandTitle');
+    if (bt) bt.textContent = ui.brand;
+    var bs = $('#brandSub');
+    if (bs) bs.textContent = ui.brandSub;
+    document.title = ui.title;
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', ui.themeColor);
+
+    var titles = { chatTitle: ui.chat, agendaTitle: ui.agenda, attendTitle: ui.attend, settingsTitle: ui.settings };
+    Object.keys(titles).forEach(function (id) {
+      var n = document.getElementById(id);
+      if (n) n.textContent = titles[id];
+    });
+    var hint = $('#attendHint');
+    if (hint) hint.textContent = ui.attendHint;
+    var itemInput = $('#itemTitle');
+    if (itemInput) itemInput.placeholder = ui.itemPh;
+    var pickleInput = $('#pickleName');
+    if (pickleInput) pickleInput.placeholder = ui.picklePh;
+    var emptyChat = $('#chatEmpty');
+    if (emptyChat) emptyChat.textContent = ui.empty;
+
+    Array.prototype.forEach.call(document.querySelectorAll('.dock-label'), function (n) {
+      var v = n.dataset[CURRENT_MODE];
+      if (v) n.textContent = v;
+    });
+
+    var summary = $('#aiSummary');
+    if (summary) summary.hidden = CURRENT_MODE !== 'ai';
+    var ms = $('#modeState');
+    if (ms) ms.dataset.state = CURRENT_MODE;
+    var mst = $('#modeStateText');
+    if (mst) mst.textContent = CURRENT_MODE === 'ai' ? 'AI 사단 관제실 모드' : '가족 회의실 모드';
+
+    setModeBar();
+    try { localStorage.setItem(MODE_KEY, CURRENT_MODE); } catch (e) { /* 무시 */ }
+    renderAll();
+  }
+
+  // 모드 버튼 — 두 방 모두 저장돼 있으면 한 번에 전환, 아니면 접속 정보 입력창을 엽니다.
+  function requestMode(mode) {
+    mode = mode === 'ai' ? 'ai' : 'family';
+    if (!ENTERED || mode === CURRENT_MODE) return;
+    var saved = BOOKMARKS[mode];
+    if (saved) { enterRoom(saved.room, saved.key, false); return; }
+    openModeDialog(mode);
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.mode-btn'), function (b) {
+    b.addEventListener('click', function () { requestMode(b.dataset.mode); });
+  });
+
+  var modeDialogEl = $('#modeDialog');
+  var dialogMode = 'ai';
+
+  function setModeDialogStatus(text, kind) {
+    var n = $('#modeDialogStatus');
+    if (!n) return;
+    n.textContent = text || '';
+    if (kind) n.dataset.kind = kind;
+    else n.removeAttribute('data-kind');
+  }
+
+  function openModeDialog(mode, errText) {
+    dialogMode = mode === 'ai' ? 'ai' : 'family';
+    var ai = dialogMode === 'ai';
+    var title = $('#modeDialogTitle');
+    var lead = $('#modeDialogLead');
+    var roomInput = $('#modeRoom');
+    var keyInput = $('#modeKey');
+    if (title) title.textContent = ai ? '🧭 AI 사단 통합 관제실 접속' : '🏠 가족 회의실 접속';
+    if (lead) {
+      lead.textContent = ai
+        ? '관제실 방 ID와 초대 키를 입력하면 이 기기에 저장하고 바로 전환합니다. 초대 링크의 room=·key= 값을 그대로 붙여 넣어도 됩니다.'
+        : '가족 회의실 방 ID와 초대 키를 입력하면 이 기기에 저장하고 바로 전환합니다.';
+    }
+    var saved = BOOKMARKS[dialogMode];
+    var sameRoom = modeOfRoom(INVITE.room) === dialogMode;
+    if (roomInput) {
+      roomInput.placeholder = ai ? 'ai_...' : 'rm_...';
+      roomInput.value = saved ? saved.room : (sameRoom ? INVITE.room : '');
+    }
+    if (keyInput) keyInput.value = saved ? saved.key : (sameRoom ? INVITE.key : '');
+    setModeDialogStatus(errText || '', errText ? 'error' : null);
+    if (modeDialogEl && typeof modeDialogEl.showModal === 'function' && !modeDialogEl.open) modeDialogEl.showModal();
+    setTimeout(function () {
+      var r = $('#modeRoom');
+      if (r && !r.value) r.focus();
+      else if (keyInput) keyInput.focus();
+    }, 40);
+  }
+
+  if (modeDialogEl) {
+    modeDialogEl.addEventListener('cancel', function () { setModeDialogStatus('', null); });
+    $('#formModeDialog').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var room = sanitizeRoom($('#modeRoom').value);
+      var key = sanitizeKey($('#modeKey').value);
+      if (!room) {
+        setModeDialogStatus('방 ID를 입력해 주세요. (예: ' + (dialogMode === 'ai' ? 'ai_...' : 'rm_...') + ')', 'error');
+        return;
+      }
+      if (key.length < MIN_KEY_LEN) {
+        setModeDialogStatus('초대 키가 올바르지 않습니다. 초대 링크의 key= 값 전체를 붙여 넣어 주세요.', 'error');
+        return;
+      }
+      if (modeDialogEl.open) modeDialogEl.close();
+      enterRoom(room, key, false);
+    });
+    $('#btnModeCancel').addEventListener('click', function () { modeDialogEl.close(); });
+  }
+
+  var btnSetupFamily = $('#btnSetupFamily');
+  if (btnSetupFamily) btnSetupFamily.addEventListener('click', function () { openModeDialog('family'); });
+  var btnSetupAi = $('#btnSetupAi');
+  if (btnSetupAi) btnSetupAi.addEventListener('click', function () { openModeDialog('ai'); });
+
   /* ------------------------------ 렌더 ------------------------------ */
 
   function renderAll() {
@@ -1220,6 +1542,7 @@
     renderOwnerSelect();
     renderItems();
     renderChat();
+    renderAiSummary();
   }
 
   renderAll();
@@ -1239,4 +1562,7 @@
     var s = normalize(JSON.parse(e.newValue));
     if (s) { state = s; renderAll(); }
   });
+
+  // 화면 검증용 최소 상태(비밀값 없음) — 자동 점검이 앱이 끝까지 실행됐는지 확인합니다.
+  window.__PMR = { version: '20261128r', ready: true, mode: function () { return CURRENT_MODE; } };
 })();
