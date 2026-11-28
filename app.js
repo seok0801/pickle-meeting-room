@@ -1914,7 +1914,7 @@
 
   // 화면 검증용 최소 상태(비밀값 없음) — 자동 점검이 앱이 끝까지 실행됐는지 확인합니다.
   window.__PMR = {
-    version: '20261128y',
+    version: '20261128z',
     ready: true,
     mode: function () { return CURRENT_MODE; },
     tab: function () { return currentTab; },
