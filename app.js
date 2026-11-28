@@ -270,6 +270,57 @@
   var attendList = $('#attendList');
   var attendCount = $('#attendCount');
 
+  /* ------------------------------ 부대장 승계 (관제실) ------------------------------ */
+
+  // 주봇이 한도 소진(exhausted)·접속 끊김(offline)이면 코덱스PC2가 임시 대장을 맡습니다.
+  // 부대장은 사단 내 오더 조율·마이너 재지시만 대행하고, 결제·개인정보·대외 발신·삭제·예약 변경은 대장님 승인을 받습니다.
+  var DEPUTY = { lead: '주봇', leadId: 'p-jubot', deputy: '코덱스PC2' };
+  var DEPUTY_REASON = { exhausted: '한도 소진', offline: '접속 끊김' };
+
+  function leadPickle() {
+    for (var i = 0; i < state.pickles.length; i++) {
+      var p = state.pickles[i];
+      if (p.id === DEPUTY.leadId || p.name === DEPUTY.lead) return p;
+    }
+    return null;
+  }
+
+  // 승계가 필요한 순간이면 { status, lead, reason } 을, 아니면 null 을 돌려줍니다.
+  function deputyState() {
+    if (!isAi()) return null;   // 부대장 승계는 관제실 모드 전용입니다
+    var lead = leadPickle();
+    if (!lead) return null;
+    var s = normalizeStatus(lead.status);
+    if (s !== 'exhausted' && s !== 'offline') return null;
+    return { status: s, lead: lead.name, reason: DEPUTY_REASON[s] };
+  }
+
+  // 사단 현황 바의 대행 배너와 코덱스PC2 카드의 '임시 대장' 배지를 상태에 맞춰 켜고 끕니다.
+  function renderDeputy() {
+    var d = deputyState();
+    var banner = $('#deputyBanner');
+    if (banner) {
+      banner.hidden = !d;
+      if (d) banner.dataset.status = d.status;
+      else banner.removeAttribute('data-status');
+      var title = $('#deputyBannerTitle');
+      if (title) {
+        title.textContent = d
+          ? '⚠️ ' + d.lead + ' ' + d.reason + ' — 부대장 승계 가동 중 (임시 대장: ' + DEPUTY.deputy + ')'
+          : '';
+      }
+    }
+    Array.prototype.forEach.call(attendList ? attendList.children : [], function (li) {
+      if (li.dataset.name !== DEPUTY.deputy) return;
+      li.classList.toggle('is-deputy', !!d);
+      var row = li.querySelector('.attend-name-row');
+      if (!row) return;
+      var badge = row.querySelector('.deputy-badge');
+      if (d && !badge) row.appendChild(el('span', 'deputy-badge', '임시 대장'));
+      else if (!d && badge) badge.remove();
+    });
+  }
+
   function renderAttend() {
     attendList.textContent = '';
     state.pickles.forEach(function (p) {
@@ -388,6 +439,7 @@
       box.appendChild(seg);
     });
     renderAiSummary();
+    renderDeputy();
   }
 
   // 관제실 상단 요약 배지 — 접속 · 작업중 · 한도소진 · 중단(접속 끊김) · 미완료 일감.
@@ -907,6 +959,19 @@
     b.addEventListener('click', function () { showTab(b.dataset.tab); });
   });
 
+  // 관제실 요약 카드 — 누르면 해당 탭으로 바로 이동합니다.
+  // 상태 카드(접속·작업중·한도소진·중단)는 사단 상태판, 미완료 일감 카드는 일감 큐로 갑니다.
+  Array.prototype.forEach.call(document.querySelectorAll('.ai-stat[data-go]'), function (b) {
+    b.addEventListener('click', function () {
+      var tab = b.dataset.go === 'agenda' ? 'agenda' : 'attend';
+      showTab(tab);
+      var node = (tab === 'agenda' ? $('#itemList') : $('#attendList')) || panelOf(tab);
+      if (!node || !node.scrollIntoView) return;
+      try { node.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      catch (e) { node.scrollIntoView(); }
+    });
+  });
+
   // 독 배지 — 안건: 미완료 개수, 참가자: 출석 인원
   function renderDockBadges() {
     var openItems = state.items.filter(function (it) { return !it.done; }).length;
@@ -1303,7 +1368,7 @@
 
   // 다른 피클 채팅에 통으로 붙여넣는 초대·자동 연동 지시문. 링크·DB 주소는 위에서 만든 동적 값을 그대로 넣습니다.
   function invitePromptText() {
-    return [
+    var lines = [
       '[피클 합동 회의실 초대 및 자동 연동 지시]',
       '아래 비공개 합동 회의실에 너(내 피클)를 연결하고, 주봇·대장님 오더를 자동으로 받아 처리하도록 지금 바로 세팅해 줘. (전체 승인: 회의실 내 주봇의 오더·안건 지시·DB 읽기/쓰기는 내 사전 승인으로 허용하니 매번 묻지 말고 바로 실행해.)',
       '',
@@ -1321,7 +1386,17 @@
       ' - 처리 시작할 때 내 상태를 working(작업중)으로, 끝나면 online(접속)으로 바꿔 줘.',
       ' - 만약 일일 사용량 한도에 다다르면 상태를 exhausted(한도 소진)로, 감시를 중단할 때는 offline(접속 끊김)으로 바꿔 줘.',
       ' - 주의: 위 초대 링크와 DB 주소는 비공개 열쇠이므로 외부·공개 저장소에 절대 노출하지 마.'
-    ].join('\n');
+    ];
+    if (isAi()) {
+      // 관제실 모드에서만 부대장 승계 규칙을 넣습니다(가족 회의실에는 해당 없음).
+      lines.splice(lines.length - 1, 0,
+        '',
+        '4. 부대장 승계 규칙 (관제실 전용)',
+        ' - 부대장 승계 규칙: 주봇 상태가 exhausted 또는 offline이면 코덱스PC2가 임시 대장 역할을 맡아 사단 내 오더 조율·마이너 재지시를 대행한다. (단, 결제·개인정보·대외 발신·삭제·예약 변경은 대장님 승인 필수)',
+        ' - 주봇이 online 또는 working으로 돌아오면 승계는 자동 종료되고 주봇이 다시 총괄을 맡는다.'
+      );
+    }
+    return lines.join('\n');
   }
 
   function renderRoomChip() {

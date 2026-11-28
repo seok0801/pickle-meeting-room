@@ -7,7 +7,7 @@
 <meta name="description" content="귀여운 피클들이 함께 모여 회의하는 합동 회의실. 출석 보드, 회의 안건·할 일, 실시간 말풍선 채팅방. AI 사단 통합 관제실 모드 포함.">
 <meta name="theme-color" content="#FFD84D">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css?v=20261128u">
+<link rel="stylesheet" href="styles.css?v=20261128v">
 <script>
 /* 화면 검증용 최소 오류 기록 — 오류 메시지만 html[data-js-errors]에 모읍니다(데이터·비밀값 없음). */
 (function () {
@@ -84,11 +84,20 @@
       </span>
     </div>
     <div class="ai-sum-grid">
-      <div class="ai-stat" data-stat="online" title="접속 중인 에이전트"><b id="statOnline">0</b><span>접속</span></div>
-      <div class="ai-stat" data-stat="working" title="작업 중인 에이전트"><b id="statWorking">0</b><span>작업중</span></div>
-      <div class="ai-stat" data-stat="exhausted" title="한도 소진 에이전트"><b id="statExhausted">0</b><span>한도소진</span></div>
-      <div class="ai-stat" data-stat="offline" title="중단(접속 끊김) 에이전트"><b id="statOffline">0</b><span>중단</span></div>
-      <div class="ai-stat" data-stat="open" title="미완료 일감"><b id="statOpen">0</b><span>미완료 일감</span></div>
+      <button type="button" class="ai-stat" data-stat="online" data-go="attend" title="접속 중인 에이전트 — 사단 상태판 열기"><b id="statOnline">0</b><span>접속</span></button>
+      <button type="button" class="ai-stat" data-stat="working" data-go="attend" title="작업 중인 에이전트 — 사단 상태판 열기"><b id="statWorking">0</b><span>작업중</span></button>
+      <button type="button" class="ai-stat" data-stat="exhausted" data-go="attend" title="한도 소진 에이전트 — 사단 상태판 열기"><b id="statExhausted">0</b><span>한도소진</span></button>
+      <button type="button" class="ai-stat" data-stat="offline" data-go="attend" title="중단(접속 끊김) 에이전트 — 사단 상태판 열기"><b id="statOffline">0</b><span>중단</span></button>
+      <button type="button" class="ai-stat" data-stat="open" data-go="agenda" title="미완료 일감 — 일감 큐 열기"><b id="statOpen">0</b><span>미완료 일감</span></button>
+    </div>
+
+    <!-- 부대장 승계 배너 — 주봇이 한도 소진/중단이면 코덱스PC2가 임시 대장을 맡습니다 -->
+    <div class="deputy-banner" id="deputyBanner" role="status" aria-live="polite" hidden>
+      <span class="deputy-ic" aria-hidden="true">⚠️</span>
+      <span class="deputy-body">
+        <strong id="deputyBannerTitle">주봇 한도 소진 — 부대장 승계 가동 중 (임시 대장: 코덱스PC2)</strong>
+        <span class="deputy-sub">결제·개인정보·대외 발신·삭제·예약 변경은 대장님 승인 대기</span>
+      </span>
     </div>
   </div>
 
@@ -278,6 +287,6 @@
   </form>
 </dialog>
 
-<script src="app.js?v=20261128u"></script>
+<script src="app.js?v=20261128v"></script>
 </body>
 </html>
